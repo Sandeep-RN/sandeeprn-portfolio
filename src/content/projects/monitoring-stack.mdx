@@ -1,110 +1,201 @@
 ---
-title: "Monitoring Stack: Prometheus + Grafana + Zabbix"
-description: "Production-grade monitoring stack managing 1000+ servers and 15k+ URL checks, with alerting rules, custom dashboards, and a zero-gap Zabbix v4 → v7 migration."
-tags: ["Prometheus", "Grafana", "Zabbix", "Observability", "Python"]
+title: "Monitoring Stack: Zabbix Migration & Automation"
+description: "Led Zabbix 4 → 7 migration across 4 customer categories with zero monitoring gaps. Built Python automation eliminating ~10 hrs/week of manual reporting across 1000+ servers."
+tags: ["Zabbix", "Python", "Ansible", "Prometheus", "Grafana", "Observability"]
 status: "done"
 date: "2024-12"
 ---
 
 ## Overview
 
-This isn't a tutorial stack — this is production observability I own at SymphonyAI, covering **1000+ servers** across Azure and OCI, **15,000+ URL checks**, and a full monitoring stack migration executed with zero monitoring gaps.
+This is production observability work at SymphonyAI — not a home lab. The scope covers **1000+ servers** across Azure and OCI, **four customer categories** (GOLD, CatPlan, CCR, Ninja), and a full Zabbix 4 → 7 migration executed with zero monitoring blind spots during cutover.
 
-## Stack Architecture
+The Python automation suite I built against the Zabbix API eliminated approximately **10 hours/week** of manual reporting work.
 
-```
-┌──────────────────────────────────────────────────────┐
-│                   Infrastructure                      │
-│   Azure VMs · OCI Compute · Kubernetes Nodes         │
-└────────┬──────────────────────────┬───────────────────┘
-         │ Zabbix Agent             │ Prometheus Exporter
-         ▼                          ▼
-┌─────────────────┐      ┌──────────────────────┐
-│   Zabbix 7      │      │   Prometheus          │
-│  (1000+ hosts)  │      │  (Kubernetes metrics) │
-│  15k+ URL checks│      │  node-exporter        │
-└────────┬────────┘      └──────────┬────────────┘
-         │                          │
-         └──────────┬───────────────┘
-                    ▼
-          ┌──────────────────┐
-          │     Grafana       │
-          │  Unified Dashboards│
-          │  Alerting Rules   │
-          └──────────────────┘
-```
+---
 
 ## Zabbix 4 → 7 Migration
 
-The most complex piece: migrating a 1000+ host inventory across multiple teams without any monitoring blind spots during cutover.
+### The Problem
 
-**Challenges:**
-- Legacy Zabbix 4 templates were inconsistent across teams — different naming conventions, overlapping host groups
-- 15,000+ URL checks needed to be preserved exactly — any gap means missed downtime alerts
-- Multiple team inventories had to be consolidated into a unified template hierarchy
+The legacy Zabbix 4 instance had grown organically across multiple teams — inconsistent template naming, overlapping host groups, 15,000+ URL checks, and custom trigger expressions that varied per team. A hard switchover would guarantee monitoring gaps.
 
-**Approach:**
-1. Rebuilt the entire template hierarchy in Zabbix 7 from scratch — standardised naming, consolidated duplicates
-2. Ran Zabbix 4 and 7 in parallel during migration window to validate parity
-3. Migrated hosts in batches by team, verifying trigger counts matched before decommissioning old hosts
-4. Zero monitoring gaps during cutover — validated by comparing active trigger counts pre/post migration
+### What I Built
 
-## Python Automation (Zabbix API)
+#### 1. Bulk host migration with automated validation
 
-Eliminated ~10 hours/week of manual reporting by automating three recurring tasks via the Zabbix API:
+Python script using the Zabbix JSON-RPC API to import hosts from CSV with groups, templates, interfaces, and tags — then validate each import against expected state:
 
 ```python
-import requests
-
-ZABBIX_URL = "https://zabbix.internal/api_jsonrpc.php"
-
-def zabbix_api(method, params, auth_token):
-    payload = {
+def add_host(session, hostname, ip, group_id, template_id, tags):
+    response = session.post(ZABBIX_URL, json={
         "jsonrpc": "2.0",
-        "method": method,
-        "params": params,
-        "auth": auth_token,
+        "method": "host.create",
+        "params": {
+            "host": hostname,
+            "interfaces": [{"type": 1, "main": 1, "useip": 1,
+                           "ip": ip, "dns": "", "port": "10050"}],
+            "groups": [{"groupid": group_id}],
+            "templates": [{"templateid": template_id}],
+            "tags": tags,
+        },
+        "auth": AUTH_TOKEN,
         "id": 1,
-    }
-    return requests.post(ZABBIX_URL, json=payload).json()["result"]
-
-# Daily unresolved alert digest
-def get_unresolved_problems(auth_token):
-    return zabbix_api("problem.get", {
-        "output": ["eventid", "name", "severity", "clock"],
-        "severities": [3, 4, 5],  # Average, High, Disaster
-        "recent": False,
-    }, auth_token)
+    })
+    return response.json()
 ```
 
-**What was automated:**
-- **Daily digest** — unresolved alerts by severity, emailed to on-call team each morning
-- **Monthly utilisation summaries** — CPU/memory trend reports per host group, auto-generated as CSV
-- **Maintenance window reports** — automated audit trail of scheduled downtime windows
+Output: CSV with `hostid`, status (success/error), and tags per host — full audit trail.
 
-## Grafana Dashboards
+#### 2. Custom items and triggers extraction
 
-Built unified dashboards that pull from both Prometheus and Zabbix datasources:
+Before decommissioning the old instance, I extracted all **non-discovered** items and triggers (the custom ones teams had added manually over years) to preserve institutional knowledge:
 
-- **Infrastructure Overview** — CPU, memory, disk across all 1000+ hosts, filterable by host group
-- **Kubernetes Platform** — pod health, HPA scaling events, node pressure from Prometheus
-- **Incident Severity Heatmap** — Zabbix trigger history visualised as a weekly heatmap to spot recurring patterns
-- **SLA/SLO Tracking** — availability percentage per service against contractual SLA commitments
+```python
+# Extract only custom items — not inherited from templates
+for host in hosts:
+    items = pyzabbix_api.item.get(
+        hostids=host['hostid'],
+        inherited=False,   # custom only
+        output=['itemid', 'name', 'key_', 'type', 'status', 'delay']
+    )
+    triggers = pyzabbix_api.trigger.get(
+        hostids=host['hostid'],
+        inherited=False,
+        output=['triggerid', 'description', 'expression', 'priority', 'status']
+    )
+```
 
-## Alerting Design
+Progress output: `[N/M]` counter per host so ops team could track a multi-hour run.
 
-Alerts are tiered to Zabbix escalation trees mapped to incident severity:
+#### 3. Enhanced trigger expressions for web scenarios
 
-| Severity | Escalation | Response SLA |
-|---|---|---|
-| Disaster | PagerDuty immediate + bridge call | 15 min |
-| High | PagerDuty + Slack | 30 min |
-| Average | Slack only | 2 hours |
-| Warning | Grafana annotation | Next business day |
+The old expressions only checked HTTP response codes. I upgraded all 15,000+ URL check triggers to also alert on **data timeout** — catching cases where monitoring itself goes silent:
+
+```python
+# Old pattern: last(web.test.rspcode[...])<>200
+# Enhanced: adds nodata condition — catches monitoring gaps too
+new_expr = re.sub(
+    r'(last\(/[^/]+/web\.test\.rspcode\[.*?\]\))<>200',
+    r'\1<>200 or nodata(\1,600)=1',
+    old_expression
+)
+```
+
+This was a significant alerting improvement — before this, a Zabbix agent failure would silently drop URL checks with no alert.
+
+#### 4. Ansible playbook for agent rollout
+
+Idempotent Ansible playbook deploying Zabbix 7 agent across the Linux fleet. Reduced per-server onboarding from ~30 minutes to under 2 minutes:
+
+```yaml
+- name: Deploy Zabbix Agent 7
+  hosts: all
+  become: yes
+  tasks:
+    - name: Copy agent config
+      copy:
+        src: zabbix_agentd.conf.org
+        dest: /etc/zabbix/zabbix_agentd.conf
+        owner: root
+        group: root
+        mode: '0644'
+
+    - name: Run agent installation script
+      script: z_agent.sh
+      args:
+        creates: /usr/sbin/zabbix_agentd
+```
+
+---
+
+## Python Automation: 10 hrs/week Eliminated
+
+### Monthly Utilisation Reports (4 Customer Categories)
+
+The biggest toil item: hand-collecting CPU and memory stats per host, categorising by customer, formatting into Excel. I automated the full pipeline.
+
+**Host categorisation** — 40+ hostname patterns per category, matched in Python to sort 1000+ hosts into the right customer bucket automatically:
+
+```python
+CATEGORY_PATTERNS = {
+    'GOLD': ['gold', 'OCI', 'InVivo', 'RMIR1', 'AlertLogic', 'Zabbix servers', ...],  # 40 patterns
+    'CatPlan': ['catplan', 'cp-sql', 'abs-cp', 'Safeway', 'Petrobras', ...],            # 45 patterns
+    'CCR': ['SRAI', 'Ayasdi', 'Crescendo', 'EurekaSDK', ...],                          # 18 patterns
+    'Ninja': []  # catch-all
+}
+```
+
+**Metric extraction from Zabbix trend data** — pulls previous month's CPU and memory min/avg/max from the Zabbix API:
+
+```python
+# CPU utilization trend (Linux)
+trend_data = zabbix_api.trend.get(
+    itemids=[item_id],
+    time_from=month_start_epoch,
+    time_till=month_end_epoch,
+    output=['clock', 'num', 'value_min', 'value_avg', 'value_max']
+)
+```
+
+**Threshold-based flagging:**
+
+| Metric | Under-utilised | Over-utilised |
+|--------|---------------|---------------|
+| CPU | < 20% | > 80% |
+| Memory | < 50% | > 80% |
+| Storage | — | > 2 TB flagged |
+
+Output: Four Excel workbooks per month — `Gold_Utilization_Report.xlsx`, `Catplan_Utilization_Report.xlsx`, `CCR_Utilization_Report.xlsx`, `Ninja_Utilization_Report.xlsx`.
+
+### Unresolved Alert Digest
+
+Daily automated report of open Zabbix problems by severity (Average, High, Disaster) — emailed to the on-call team each morning, removing the need for anyone to manually check the Zabbix dashboard before shift start.
+
+### Failed Agent Tracking
+
+Script to identify disabled/unreachable Zabbix agents across all customer categories — catches agent drift before it causes monitoring blind spots. Outputs CSV with agent name, status, and last-seen timestamp.
+
+---
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                     Infrastructure (1000+ servers)               │
+│         Azure VMs · OCI Compute · Kubernetes Nodes              │
+└────────────────────────┬──────────────────────────────┬─────────┘
+                         │ Zabbix Agent (port 10050)    │ Prometheus exporter
+                         ▼                              ▼
+              ┌────────────────────┐        ┌─────────────────────┐
+              │    Zabbix 7.2      │        │    Prometheus        │
+              │  1000+ hosts       │        │  Kubernetes metrics  │
+              │  15k+ URL checks   │        │  node-exporter       │
+              │  4 customer groups │        └──────────┬──────────┘
+              └──────────┬─────────┘                   │
+                         └─────────────┬───────────────┘
+                                       ▼
+                             ┌──────────────────┐
+                             │     Grafana       │
+                             │  Unified dashboards│
+                             │  SLA tracking     │
+                             └──────────────────┘
+                                       │
+                                       ▼
+                         ┌─────────────────────────┐
+                         │   Python Automation      │
+                         │  Zabbix API JSON-RPC     │
+                         │  Monthly Excel reports   │
+                         │  Daily alert digests     │
+                         └─────────────────────────┘
+```
+
+---
 
 ## What This Demonstrates
 
-- **Production scale** — 1000+ servers is not a lab, it requires discipline around template hygiene and alert noise management
-- **Migration execution** — zero-gap cutover requires parallel validation, not a hard switchover
-- **API automation** — toil elimination through code, not headcount
-- **Observability philosophy** — alerting trees mapped to business impact, not just resource thresholds
+- **Migration execution at scale** — 15,000+ URL checks, zero gap. Parallel validation before cutover, not a hard switchover.
+- **Alerting improvement** — `nodata()` condition upgrade means monitoring failures are now visible, not silent.
+- **API-first automation** — JSON-RPC Zabbix API, pyzabbix, pandas, openpyxl — the full Python data pipeline.
+- **Toil quantification** — ~10 hrs/week eliminated is a number I can defend: 4 reports × ~2.5 hrs manual effort each.
+- **Ansible at fleet scale** — idempotent agent rollout, 30 min → 2 min per server onboarding.
