@@ -1,0 +1,122 @@
+---
+title: "Docker Multi-Service App → ECR"
+description: "Multi-service application containerized with Docker and pushed to Amazon ECR with proper image tagging and lifecycle policies."
+tags: ["Docker", "AWS ECR", "Containerization", "AWS"]
+status: "done"
+date: "2025-06"
+github: "https://github.com/Sandeep-RN/sandeeprn-portfolio"
+---
+
+## Overview
+
+This project demonstrates containerizing a multi-service application using Docker and managing the image lifecycle with Amazon Elastic Container Registry (ECR). The goal: a repeatable, production-style containerization workflow that mirrors how real teams ship services.
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────┐
+│              Local Development               │
+│                                             │
+│  ┌──────────┐   ┌──────────┐   ┌─────────┐ │
+│  │ Service A│   │ Service B│   │  Nginx  │ │
+│  │(FastAPI) │   │(Worker)  │   │(Proxy)  │ │
+│  └────┬─────┘   └────┬─────┘   └────┬────┘ │
+│       └──────────────┴──────────────┘       │
+│                docker-compose               │
+└─────────────────┬───────────────────────────┘
+                  │ docker build + tag
+                  ▼
+┌─────────────────────────────────────────────┐
+│            Amazon ECR (Private)              │
+│                                             │
+│  sandeeprn/service-a:latest                 │
+│  sandeeprn/service-a:1.0.0                  │
+│  sandeeprn/service-b:latest                 │
+└─────────────────────────────────────────────┘
+```
+
+## Key Steps
+
+### 1. Dockerfile per service
+
+Each service gets its own `Dockerfile` with a multi-stage build to keep the final image lean:
+
+```dockerfile
+# Build stage
+FROM python:3.12-slim AS builder
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Runtime stage
+FROM python:3.12-slim
+WORKDIR /app
+COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
+COPY . .
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+```
+
+### 2. docker-compose for local orchestration
+
+```yaml
+services:
+  api:
+    build: ./api
+    ports:
+      - "8000:8000"
+    environment:
+      - ENV=development
+  worker:
+    build: ./worker
+    depends_on:
+      - api
+  proxy:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf
+```
+
+### 3. ECR authentication and push
+
+```bash
+# Authenticate Docker to ECR
+aws ecr get-login-password --region ap-south-1 | \
+  docker login --username AWS --password-stdin \
+  <account-id>.dkr.ecr.ap-south-1.amazonaws.com
+
+# Tag and push
+docker tag service-a:latest \
+  <account-id>.dkr.ecr.ap-south-1.amazonaws.com/sandeeprn/service-a:1.0.0
+
+docker push <account-id>.dkr.ecr.ap-south-1.amazonaws.com/sandeeprn/service-a:1.0.0
+```
+
+### 4. ECR lifecycle policy
+
+Keeps the last 5 tagged images, expires untagged images after 1 day — keeps storage costs minimal:
+
+```json
+{
+  "rules": [
+    {
+      "rulePriority": 1,
+      "selection": {
+        "tagStatus": "untagged",
+        "countType": "sinceImagePushed",
+        "countUnit": "days",
+        "countNumber": 1
+      },
+      "action": { "type": "expire" }
+    }
+  ]
+}
+```
+
+## What This Demonstrates
+
+- **Multi-stage builds** — smaller production images, no build toolchain in runtime
+- **Service composition** — real-world multi-service topology with a reverse proxy
+- **ECR workflow** — authentication, tagging strategy (semver + latest), lifecycle management
+- **Production mindset** — environment separation, image hygiene, repeatable builds

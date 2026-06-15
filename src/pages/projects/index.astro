@@ -1,0 +1,43 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import { getCollection } from 'astro:content';
+
+const projects = await getCollection('projects');
+const sorted = projects.sort((a, b) => (a.data.status === 'done' ? -1 : 1));
+---
+
+<Layout title="Projects — Sandeep R N">
+  <div class="max-w-5xl mx-auto px-6 py-16">
+    <p class="font-mono text-[#00ff88] text-sm mb-2 tracking-widest uppercase">$ cat ./projects</p>
+    <h1 class="text-4xl font-bold mb-3">Projects</h1>
+    <p class="text-[#8b949e] mb-12">Real infra. Real pipelines. Real observability.</p>
+
+    <div class="grid md:grid-cols-2 gap-6">
+      {sorted.map((project) => (
+        <a
+          href={`/projects/${project.id}`}
+          class="group border border-[#30363d] rounded-lg p-6 bg-[#161b22] hover:border-[#00ff88] transition-colors block"
+        >
+          <div class="flex items-start justify-between mb-3">
+            <h2 class="font-semibold text-[#e6edf3] group-hover:text-[#00ff88] transition-colors leading-tight">
+              {project.data.title}
+            </h2>
+            {project.data.status === 'in-progress' && (
+              <span class="ml-3 shrink-0 px-2 py-0.5 text-xs font-mono bg-[#00ff8820] text-[#00ff88] border border-[#00ff8840] rounded">
+                in progress
+              </span>
+            )}
+          </div>
+          <p class="text-[#8b949e] text-sm mb-4 leading-relaxed">{project.data.description}</p>
+          <div class="flex flex-wrap gap-2">
+            {project.data.tags.map((tag: string) => (
+              <span class="px-2 py-0.5 text-xs font-mono text-[#8b949e] border border-[#30363d] rounded">
+                {tag}
+              </span>
+            ))}
+          </div>
+        </a>
+      ))}
+    </div>
+  </div>
+</Layout>

@@ -1,0 +1,136 @@
+---
+title: "EKS Cluster via Terraform"
+description: "Production-style EKS cluster provisioned using Terraform VPC and EKS modules with remote state in S3 + DynamoDB locking."
+tags: ["Terraform", "EKS", "AWS", "IaC", "Kubernetes"]
+status: "in-progress"
+date: "2026-06"
+github: "https://github.com/Sandeep-RN/sandeeprn-portfolio"
+---
+
+## Overview
+
+Provisioning a production-style Amazon EKS cluster using Terraform — using the official community modules for VPC and EKS, with remote state stored in S3 and DynamoDB for state locking. This is the IaC + Kubernetes intersection that Platform Engineering roles look for.
+
+> **Status:** In progress as part of a structured Udemy course on Terraform and AWS. Remote backend (S3 + DynamoDB) is complete. EKS provisioning in progress.
+
+## Infrastructure Design
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                    AWS Account                           │
+│                                                         │
+│  ┌─────────────────────────────────────────────────┐   │
+│  │                  VPC (10.0.0.0/16)               │   │
+│  │                                                  │   │
+│  │  ┌──────────────┐    ┌──────────────┐           │   │
+│  │  │ Public Subnet│    │ Public Subnet│           │   │
+│  │  │  ap-south-1a │    │  ap-south-1b │           │   │
+│  │  └──────┬───────┘    └──────┬───────┘           │   │
+│  │         │ NAT GW            │ NAT GW             │   │
+│  │  ┌──────▼───────┐    ┌──────▼───────┐           │   │
+│  │  │Private Subnet│    │Private Subnet│           │   │
+│  │  │  EKS Nodes   │    │  EKS Nodes   │           │   │
+│  │  └──────────────┘    └──────────────┘           │   │
+│  └─────────────────────────────────────────────────┘   │
+│                                                         │
+│  EKS Control Plane (managed)                            │
+│  Node Group: t3.medium × 2 (min 1, max 4)              │
+└─────────────────────────────────────────────────────────┘
+
+  Remote State:
+  S3 bucket: sandeeprn-tf-state
+  DynamoDB:  sandeeprn-tf-lock
+```
+
+## Remote Backend (Complete)
+
+The first piece — remote state with locking prevents concurrent applies from corrupting state:
+
+```hcl
+# backend.tf
+terraform {
+  backend "s3" {
+    bucket         = "sandeeprn-tf-state"
+    key            = "eks-cluster/terraform.tfstate"
+    region         = "ap-south-1"
+    dynamodb_table = "sandeeprn-tf-lock"
+    encrypt        = true
+  }
+}
+```
+
+The S3 bucket and DynamoDB table are themselves provisioned by a separate bootstrap Terraform config — state for the state backend is local only:
+
+```hcl
+# bootstrap/main.tf
+resource "aws_s3_bucket" "tf_state" {
+  bucket = "sandeeprn-tf-state"
+}
+
+resource "aws_s3_bucket_versioning" "tf_state" {
+  bucket = aws_s3_bucket.tf_state.id
+  versioning_configuration { status = "Enabled" }
+}
+
+resource "aws_dynamodb_table" "tf_lock" {
+  name         = "sandeeprn-tf-lock"
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "LockID"
+  attribute {
+    name = "LockID"
+    type = "S"
+  }
+}
+```
+
+## EKS Cluster (In Progress)
+
+Using the official `terraform-aws-modules/eks` and `terraform-aws-modules/vpc` modules:
+
+```hcl
+module "vpc" {
+  source  = "terraform-aws-modules/vpc/aws"
+  version = "~> 5.0"
+
+  name = "sandeeprn-eks-vpc"
+  cidr = "10.0.0.0/16"
+
+  azs             = ["ap-south-1a", "ap-south-1b"]
+  private_subnets = ["10.0.1.0/24", "10.0.2.0/24"]
+  public_subnets  = ["10.0.101.0/24", "10.0.102.0/24"]
+
+  enable_nat_gateway = true
+  single_nat_gateway = true  # cost optimisation for non-prod
+
+  tags = {
+    "kubernetes.io/cluster/sandeeprn-eks" = "shared"
+  }
+}
+
+module "eks" {
+  source  = "terraform-aws-modules/eks/aws"
+  version = "~> 20.0"
+
+  cluster_name    = "sandeeprn-eks"
+  cluster_version = "1.30"
+
+  vpc_id     = module.vpc.vpc_id
+  subnet_ids = module.vpc.private_subnets
+
+  eks_managed_node_groups = {
+    general = {
+      desired_size   = 2
+      min_size       = 1
+      max_size       = 4
+      instance_types = ["t3.medium"]
+    }
+  }
+}
+```
+
+## What This Demonstrates
+
+- **IaC best practices** — remote state, state locking, module reuse over hand-rolled resources
+- **EKS architecture** — private node groups, NAT gateway, proper subnet tagging for Kubernetes
+- **Terraform module usage** — community modules vs writing everything from scratch (the right call for well-tested infra patterns)
+- **Cost awareness** — single NAT gateway for non-prod, PAY_PER_REQUEST DynamoDB, right-sized nodes
