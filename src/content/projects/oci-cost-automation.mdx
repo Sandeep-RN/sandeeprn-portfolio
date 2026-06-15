@@ -1,0 +1,165 @@
+---
+title: "OCI Cloud Cost Automation"
+description: "Built automated detection and cleanup of unattached OCI volumes across 20+ customer compartments and 8+ regions, identifying $378/month ($4,536/year) in cloud waste."
+tags: ["Python", "OCI", "Cloud Cost", "Automation", "Multi-tenant"]
+status: "done"
+date: "2025-12"
+---
+
+## Overview
+
+A recurring pain point at SymphonyAI: Vulnerability Assessment (VA) remediation creates boot volume snapshots automatically, but nobody cleans them up. The result is hundreds of unattached volumes accumulating across 20+ customer OCI compartments, silently running up cloud bills.
+
+OCI Cloud Advisor surfaced the problem. I built the automation to fix it — and keep it fixed.
+
+**Identified waste: $378.10/month ($4,536/year)** across 20+ customer compartments.
+
+---
+
+## The Problem (Real Numbers from OCI Cloud Advisor)
+
+| Resource Type | Count | Monthly Cost |
+|---|---|---|
+| Unattached boot volumes | 161 | $286.03 |
+| Unattached block volumes | 13 | $92.07 |
+| **Total** | **174** | **$378.10** |
+
+Storage rate: $0.0425/GB-month. At 161 boot volumes, that adds up fast — especially when VA scans run weekly and no cleanup process exists.
+
+---
+
+## What I Built
+
+A Python automation suite with three layers: **discovery**, **safety gates**, and **reporting**.
+
+### Multi-Region, Multi-Compartment Discovery
+
+The script authenticates to OCI (config file or Instance Principals) and iterates every subscribed region and every compartment — including child compartments — to find all `AVAILABLE` (unattached) volumes:
+
+```python
+def get_unattached_volumes(block_client, compute_client, compartment_id):
+    volumes = block_client.list_volumes(
+        compartment_id=compartment_id,
+        lifecycle_state="AVAILABLE"
+    ).data
+
+    unattached = []
+    for vol in volumes:
+        attachments = compute_client.list_volume_attachments(
+            compartment_id=compartment_id,
+            volume_id=vol.id
+        ).data
+        if not attachments:
+            unattached.append(vol)
+    return unattached
+```
+
+**Scope: 8+ regions** — US (Ashburn, Phoenix), EU (Frankfurt, London, Amsterdam, Paris), APAC (Tokyo, Sydney).
+
+### Intelligent Expiry Parsing (6 Regex Patterns)
+
+Not every unattached volume should be deleted. Some are intentionally retained. The script reads volume tags and names to detect expiry intent — 6 different date formats teams use:
+
+```python
+EXPIRY_PATTERNS = [
+    r'\b(\d{8})\b',                          # 20251231
+    r'\b(\d{2})[_\-/](\d{2})[_\-/](\d{4})\b',  # 31-12-2025
+    r'\b(\d{2})[_\-/](\d{2})[_\-/](\d{2})\b',  # 31-12-25
+    r'DEL[_\-]?<(\d{8})>',                   # DEL-<20250712>
+    r'(?:EXP|EXPIRY)[_\-]?(\d+)',             # EXP20250101
+    r'Crt\((\d{2}-\d{2}-\d{2})\)',           # Crt(11-12-25)
+]
+```
+
+### Safety Gates
+
+The automation won't delete anything without clearing multiple checks:
+
+1. **Hold tags** — if a volume has `cleanup_hold=true` or `do_not_delete=true`, it's skipped unconditionally.
+2. **24-hour confirmation window** — plan runs first, deletion requires a separate apply step after review.
+3. **Per-volume verification** — before each deletion, re-checks that the volume is still unattached.
+4. **Dry-run mode** — full discovery and reporting without any destructive action.
+
+```python
+def is_protected(volume):
+    tags = volume.freeform_tags or {}
+    return (
+        tags.get('cleanup_hold', '').lower() == 'true' or
+        tags.get('do_not_delete', '').lower() == 'true'
+    )
+```
+
+### Executive Reporting
+
+Pre-delete email with HTML summary — built for the ops team to review before approving cleanup:
+
+```
+Subject: OCI Volume Cleanup Plan — 174 volumes · $378.10/month savings
+
+SUMMARY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Customer compartments scanned:  20+
+Unattached boot volumes:        161
+Unattached block volumes:        13
+Total monthly savings:      $378.10
+Estimated annual savings:  $4,536+
+
+TOP 5 BY COST
+🚨 compartment_gold       — $94.20/month
+🚨 customer_c4r           — $71.50/month
+   customer_calsun        — $43.80/month
+   customer_festivalfoods — $38.10/month
+   customer_dis           — $31.60/month
+```
+
+Post-deletion apply email shows actual deleted count, skipped (held) count, and confirmed savings.
+
+### Output Artifacts
+
+| File | Contents |
+|---|---|
+| `snapshot_cleanup_plan.json` | Candidate list with metadata |
+| `snapshot_cleanup_discovered.csv` | All token-matched volumes (scope audit) |
+| `snapshot_cleanup_candidates.csv` | Eligible for deletion |
+| `snapshot_cleanup_applied.csv` | Deletion confirmations with timestamps |
+| `unattached_volumes_report.xlsx` | Per-customer sheets + SUMMARY tab |
+| `batch_processing_summary.json` | Totals: customers, volumes, GB, cost |
+
+---
+
+## Architecture
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│                OCI (8+ Regions, 20+ Compartments)             │
+│                                                              │
+│  Boot Volumes (161 unattached)  Block Volumes (13 unattached)│
+└────────────────────────┬─────────────────────────────────────┘
+                         │ OCI Python SDK
+                         ▼
+┌──────────────────────────────────────────────────────────────┐
+│                  Python Automation                            │
+│                                                              │
+│  ┌────────────┐   ┌──────────────┐   ┌────────────────────┐ │
+│  │  Discovery  │   │ Safety Gates │   │   Cost Calculation  │ │
+│  │ All regions │ → │ Hold tags    │ → │ $0.0425/GB-month   │ │
+│  │ All compts  │   │ Expiry parse │   │ Per-compartment    │ │
+│  └────────────┘   └──────────────┘   └────────────────────┘ │
+│                                                              │
+│  ┌────────────┐   ┌──────────────┐   ┌────────────────────┐ │
+│  │    Plan     │   │    Apply     │   │    Email Report     │ │
+│  │ CSV + JSON  │ → │ Delete + log │ → │ HTML + Excel       │ │
+│  │ Review step │   │ Verified del │   │ Executive summary  │ │
+│  └────────────┘   └──────────────┘   └────────────────────┘ │
+└──────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## What This Demonstrates
+
+- **Real cost impact** — $378/month identified is an actual business number from OCI Cloud Advisor, not estimated.
+- **Multi-tenant scale** — 20+ customer compartments means the script has to handle varied tag conventions, naming patterns, and compartment structures across teams that didn't coordinate.
+- **Production safety discipline** — plan/apply separation, hold tags, per-volume re-verification before deletion. This is how you build automation ops teams trust to run unsupervised.
+- **Executive-level reporting** — the output is built for a manager to approve, not just for an engineer to read.
+- **OCI SDK depth** — BlockstorageClient, ComputeClient, IdentityClient, compartment hierarchy traversal, region enumeration.
