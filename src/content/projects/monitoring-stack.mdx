@@ -1,0 +1,110 @@
+---
+title: "Monitoring Stack: Prometheus + Grafana + Zabbix"
+description: "Production-grade monitoring stack managing 1000+ servers and 15k+ URL checks, with alerting rules, custom dashboards, and a zero-gap Zabbix v4 → v7 migration."
+tags: ["Prometheus", "Grafana", "Zabbix", "Observability", "Python"]
+status: "done"
+date: "2024-12"
+---
+
+## Overview
+
+This isn't a tutorial stack — this is production observability I own at SymphonyAI, covering **1000+ servers** across Azure and OCI, **15,000+ URL checks**, and a full monitoring stack migration executed with zero monitoring gaps.
+
+## Stack Architecture
+
+```
+┌──────────────────────────────────────────────────────┐
+│                   Infrastructure                      │
+│   Azure VMs · OCI Compute · Kubernetes Nodes         │
+└────────┬──────────────────────────┬───────────────────┘
+         │ Zabbix Agent             │ Prometheus Exporter
+         ▼                          ▼
+┌─────────────────┐      ┌──────────────────────┐
+│   Zabbix 7      │      │   Prometheus          │
+│  (1000+ hosts)  │      │  (Kubernetes metrics) │
+│  15k+ URL checks│      │  node-exporter        │
+└────────┬────────┘      └──────────┬────────────┘
+         │                          │
+         └──────────┬───────────────┘
+                    ▼
+          ┌──────────────────┐
+          │     Grafana       │
+          │  Unified Dashboards│
+          │  Alerting Rules   │
+          └──────────────────┘
+```
+
+## Zabbix 4 → 7 Migration
+
+The most complex piece: migrating a 1000+ host inventory across multiple teams without any monitoring blind spots during cutover.
+
+**Challenges:**
+- Legacy Zabbix 4 templates were inconsistent across teams — different naming conventions, overlapping host groups
+- 15,000+ URL checks needed to be preserved exactly — any gap means missed downtime alerts
+- Multiple team inventories had to be consolidated into a unified template hierarchy
+
+**Approach:**
+1. Rebuilt the entire template hierarchy in Zabbix 7 from scratch — standardised naming, consolidated duplicates
+2. Ran Zabbix 4 and 7 in parallel during migration window to validate parity
+3. Migrated hosts in batches by team, verifying trigger counts matched before decommissioning old hosts
+4. Zero monitoring gaps during cutover — validated by comparing active trigger counts pre/post migration
+
+## Python Automation (Zabbix API)
+
+Eliminated ~10 hours/week of manual reporting by automating three recurring tasks via the Zabbix API:
+
+```python
+import requests
+
+ZABBIX_URL = "https://zabbix.internal/api_jsonrpc.php"
+
+def zabbix_api(method, params, auth_token):
+    payload = {
+        "jsonrpc": "2.0",
+        "method": method,
+        "params": params,
+        "auth": auth_token,
+        "id": 1,
+    }
+    return requests.post(ZABBIX_URL, json=payload).json()["result"]
+
+# Daily unresolved alert digest
+def get_unresolved_problems(auth_token):
+    return zabbix_api("problem.get", {
+        "output": ["eventid", "name", "severity", "clock"],
+        "severities": [3, 4, 5],  # Average, High, Disaster
+        "recent": False,
+    }, auth_token)
+```
+
+**What was automated:**
+- **Daily digest** — unresolved alerts by severity, emailed to on-call team each morning
+- **Monthly utilisation summaries** — CPU/memory trend reports per host group, auto-generated as CSV
+- **Maintenance window reports** — automated audit trail of scheduled downtime windows
+
+## Grafana Dashboards
+
+Built unified dashboards that pull from both Prometheus and Zabbix datasources:
+
+- **Infrastructure Overview** — CPU, memory, disk across all 1000+ hosts, filterable by host group
+- **Kubernetes Platform** — pod health, HPA scaling events, node pressure from Prometheus
+- **Incident Severity Heatmap** — Zabbix trigger history visualised as a weekly heatmap to spot recurring patterns
+- **SLA/SLO Tracking** — availability percentage per service against contractual SLA commitments
+
+## Alerting Design
+
+Alerts are tiered to Zabbix escalation trees mapped to incident severity:
+
+| Severity | Escalation | Response SLA |
+|---|---|---|
+| Disaster | PagerDuty immediate + bridge call | 15 min |
+| High | PagerDuty + Slack | 30 min |
+| Average | Slack only | 2 hours |
+| Warning | Grafana annotation | Next business day |
+
+## What This Demonstrates
+
+- **Production scale** — 1000+ servers is not a lab, it requires discipline around template hygiene and alert noise management
+- **Migration execution** — zero-gap cutover requires parallel validation, not a hard switchover
+- **API automation** — toil elimination through code, not headcount
+- **Observability philosophy** — alerting trees mapped to business impact, not just resource thresholds

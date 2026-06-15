@@ -1,0 +1,123 @@
+---
+title: "Career Tracker App"
+description: "Full-stack career tracking application — FastAPI backend on Oracle Cloud Free Tier, React frontend, deployed at sandeeprn.in/tracker."
+tags: ["FastAPI", "React", "Python", "OCI", "Full-Stack", "Docker"]
+status: "in-progress"
+date: "2026-06"
+github: "https://github.com/Sandeep-RN/sandeeprn-portfolio"
+---
+
+## Overview
+
+A personal full-stack project that solves a real problem: tracking job applications, cert progress, and skill milestones during a career transition. The goal is also to demonstrate end-to-end ownership — backend API, frontend UI, containerized deployment, and OCI Free Tier hosting.
+
+> **Status:** In progress. Architecture is finalised, backend scaffolded. Frontend in development. Live at sandeeprn.in/tracker once deployed.
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────────────┐
+│               sandeeprn.in/tracker                   │
+│                                                     │
+│  ┌──────────────────────────────────────────────┐  │
+│  │            React Frontend (Vite)              │  │
+│  │  Job Board · Cert Progress · Skill Timeline   │  │
+│  └─────────────────┬────────────────────────────┘  │
+│                    │ REST API                        │
+└────────────────────┼────────────────────────────────┘
+                     │
+┌────────────────────┼────────────────────────────────┐
+│         Oracle Cloud Free Tier (ARM VM)              │
+│                    │                                 │
+│  ┌─────────────────▼────────────────────────────┐  │
+│  │         FastAPI (Python)                      │  │
+│  │  /applications  /certs  /skills  /stats       │  │
+│  └─────────────────┬────────────────────────────┘  │
+│                    │                                 │
+│  ┌─────────────────▼────────────────────────────┐  │
+│  │         SQLite (dev) → PostgreSQL (prod)      │  │
+│  └──────────────────────────────────────────────┘  │
+│                                                     │
+│  Docker Compose · Nginx reverse proxy · HTTPS       │
+└─────────────────────────────────────────────────────┘
+```
+
+## Backend: FastAPI
+
+```python
+from fastapi import FastAPI
+from pydantic import BaseModel
+from datetime import date
+
+app = FastAPI(title="Career Tracker API")
+
+class Application(BaseModel):
+    company: str
+    role: str
+    applied_date: date
+    status: str  # applied | screening | interview | offer | rejected
+    notes: str = ""
+
+@app.post("/applications")
+async def create_application(app: Application):
+    # persist to DB
+    return {"id": 1, **app.dict()}
+
+@app.get("/stats")
+async def get_stats():
+    return {
+        "total_applied": 24,
+        "in_progress": 5,
+        "offers": 1,
+        "response_rate": "29%"
+    }
+```
+
+**API endpoints planned:**
+- `POST /applications` — log a new job application
+- `GET /applications` — list with filters (status, date range, role type)
+- `PATCH /applications/{id}` — update status as pipeline progresses
+- `POST /certs` — track cert progress (name, % complete, target date)
+- `GET /stats` — aggregated metrics for the dashboard
+
+## Frontend: React + Vite
+
+Three main views:
+
+1. **Job Board** — Kanban-style columns (Applied → Screening → Interview → Offer/Rejected)
+2. **Cert Progress** — progress bars for active certifications with target dates
+3. **Timeline** — visual arc of skills and certs by year
+
+## OCI Free Tier Deployment
+
+Oracle Cloud's Always Free tier provides an ARM-based VM (4 OCPUs, 24GB RAM) — more than enough to host this stack permanently at zero cost:
+
+```yaml
+# docker-compose.yml on OCI VM
+services:
+  api:
+    image: sandeeprn/career-tracker-api:latest
+    env_file: .env
+    restart: always
+
+  frontend:
+    image: sandeeprn/career-tracker-frontend:latest
+    restart: always
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf
+      - ./certs:/etc/letsencrypt
+    restart: always
+```
+
+## What This Demonstrates
+
+- **Full-stack ownership** — API design, frontend, deployment, and DNS wiring end-to-end
+- **OCI Free Tier** — practical use of cloud free tier for personal projects (relevant to cost optimisation)
+- **FastAPI + Pydantic** — modern Python API patterns with automatic OpenAPI docs
+- **Docker Compose** — production-like deployment without Kubernetes overhead for a small project
