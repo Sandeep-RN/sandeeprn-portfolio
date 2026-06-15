@@ -1,0 +1,51 @@
+---
+import '../styles/global.css';
+
+interface Props {
+  title?: string;
+  description?: string;
+}
+
+const {
+  title = 'Sandeep R N — Cloud Engineer & Platform Engineer',
+  description = 'Senior Cloud Engineer / SRE transitioning to Platform Engineering. Automation-first. Observability-driven. Multi-cloud.',
+} = Astro.props;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content={description} />
+    <meta name="generator" content={Astro.generator} />
+    <title>{title}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body class="bg-[#0d1117] text-[#e6edf3]">
+    <nav class="fixed top-0 left-0 right-0 z-50 border-b border-[#30363d] bg-[#0d1117]/90 backdrop-blur-sm">
+      <div class="max-w-5xl mx-auto px-6 h-14 flex items-center justify-between">
+        <a href="/" class="font-mono text-[#00ff88] font-medium text-sm tracking-wide">
+          sandeep<span class="text-[#8b949e]">@cloud</span>:~$
+        </a>
+        <div class="flex gap-6 text-sm text-[#8b949e]">
+          <a href="/#projects" class="hover:text-[#e6edf3] transition-colors">projects</a>
+          <a href="/certifications" class="hover:text-[#e6edf3] transition-colors">certs</a>
+          <a href="/blog" class="hover:text-[#e6edf3] transition-colors">blog</a>
+          <a href="/#contact" class="hover:text-[#00ff88] transition-colors font-mono">./contact</a>
+        </div>
+      </div>
+    </nav>
+    <main class="pt-14">
+      <slot />
+    </main>
+    <footer class="border-t border-[#30363d] mt-24 py-8 text-center text-[#8b949e] text-sm font-mono">
+      Built with Astro · Deployed on Cloudflare Pages · sandeeprn.in
+    </footer>
+  </body>
+</html>
