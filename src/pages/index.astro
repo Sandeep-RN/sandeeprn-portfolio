@@ -1,0 +1,174 @@
+---
+import Layout from '../layouts/Layout.astro';
+---
+
+<Layout>
+  <!-- Hero -->
+  <section class="min-h-[90vh] flex flex-col justify-center max-w-5xl mx-auto px-6 py-20">
+    <p class="font-mono text-[#00ff88] text-sm mb-4 tracking-widest uppercase">
+      $ whoami
+    </p>
+    <h1 class="text-5xl md:text-7xl font-bold text-[#e6edf3] leading-tight mb-4">
+      Sandeep R N
+    </h1>
+    <div class="flex flex-wrap items-center gap-2 mb-6">
+      <span class="text-xl md:text-3xl text-[#8b949e] font-mono">Senior Cloud Engineer</span>
+      <span class="text-xl md:text-3xl text-[#00ff88] font-mono">→</span>
+      <span class="text-xl md:text-3xl text-[#e6edf3] font-mono">Platform Engineer</span>
+      <span class="cursor-blink"></span>
+    </div>
+    <p class="text-[#8b949e] text-lg max-w-2xl mb-10 leading-relaxed">
+      Automation-first. Observability-driven. Multi-cloud.<br />
+      3+ years in SRE — building infra that scales, pipelines that ship, and dashboards that tell the truth.
+    </p>
+    <div class="flex flex-wrap gap-4">
+      <a
+        href="#projects"
+        class="px-6 py-3 bg-[#00ff88] text-[#0d1117] font-semibold rounded font-mono text-sm hover:bg-[#00cc6a] transition-colors"
+      >
+        ./view-projects
+      </a>
+      <a
+        href="#contact"
+        class="px-6 py-3 border border-[#30363d] text-[#e6edf3] rounded font-mono text-sm hover:border-[#00ff88] hover:text-[#00ff88] transition-colors"
+      >
+        ./contact
+      </a>
+    </div>
+
+    <div class="mt-20 grid grid-cols-2 md:grid-cols-4 gap-6">
+      {[
+        { value: '3+', label: 'Years SRE' },
+        { value: '3', label: 'Cloud Certs' },
+        { value: 'AWS · Azure · OCI', label: 'Multi-cloud' },
+        { value: 'CKA · TF Assoc', label: 'In Progress' },
+      ].map((stat) => (
+        <div class="border border-[#30363d] rounded-lg p-4 bg-[#161b22]">
+          <div class="font-mono text-[#00ff88] font-bold text-xl mb-1">{stat.value}</div>
+          <div class="text-[#8b949e] text-xs uppercase tracking-wide">{stat.label}</div>
+        </div>
+      ))}
+    </div>
+  </section>
+
+  <!-- Skills -->
+  <section class="max-w-5xl mx-auto px-6 py-16 border-t border-[#30363d]">
+    <p class="font-mono text-[#00ff88] text-sm mb-2 tracking-widest uppercase">$ ls ./skills</p>
+    <h2 class="text-3xl font-bold mb-10">Technical Stack</h2>
+    <div class="grid md:grid-cols-2 gap-6">
+      {[
+        { category: 'Cloud', items: ['AWS', 'Azure (AZ-104, DevOps Expert)', 'Oracle Cloud (OCI)'] },
+        { category: 'IaC & Automation', items: ['Terraform', 'Ansible', 'Azure DevOps Pipelines'] },
+        { category: 'Containers & Orchestration', items: ['Kubernetes', 'Docker', 'Amazon ECR', 'Amazon EKS'] },
+        { category: 'Observability', items: ['Prometheus', 'Grafana', 'Zabbix'] },
+      ].map((group) => (
+        <div class="border border-[#30363d] rounded-lg p-5 bg-[#161b22]">
+          <h3 class="font-mono text-[#00ff88] text-xs uppercase tracking-widest mb-3">{group.category}</h3>
+          <div class="flex flex-wrap gap-2">
+            {group.items.map((item) => (
+              <span class="px-3 py-1 bg-[#0d1117] border border-[#30363d] rounded text-[#e6edf3] text-sm font-mono">
+                {item}
+              </span>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  </section>
+
+  <!-- Projects -->
+  <section id="projects" class="max-w-5xl mx-auto px-6 py-16 border-t border-[#30363d]">
+    <p class="font-mono text-[#00ff88] text-sm mb-2 tracking-widest uppercase">$ cat ./projects</p>
+    <h2 class="text-3xl font-bold mb-3">Featured Projects</h2>
+    <p class="text-[#8b949e] mb-10">Real infra. Real pipelines. Real observability.</p>
+    <div class="grid md:grid-cols-2 gap-6">
+      {[
+        {
+          title: 'Docker Multi-Service App → ECR',
+          tags: ['Docker', 'AWS ECR', 'Containerization'],
+          desc: 'Multi-service application containerized with Docker and pushed to Amazon ECR with proper image tagging and lifecycle policies.',
+          slug: 'docker-ecr',
+          done: true,
+        },
+        {
+          title: 'Monitoring Stack: Prometheus + Grafana + Zabbix',
+          tags: ['Prometheus', 'Grafana', 'Zabbix', 'Observability'],
+          desc: 'Production-grade monitoring stack with alerting rules, custom dashboards, and Zabbix integration for infrastructure visibility.',
+          slug: 'monitoring-stack',
+          done: true,
+        },
+        {
+          title: 'Career Tracker App',
+          tags: ['FastAPI', 'React', 'OCI', 'Full-Stack'],
+          desc: 'Full-stack career tracking application. FastAPI backend on Oracle Cloud Free Tier, React frontend at sandeeprn.in/tracker.',
+          slug: 'career-tracker',
+          done: false,
+        },
+        {
+          title: 'EKS Cluster via Terraform',
+          tags: ['Terraform', 'EKS', 'AWS', 'IaC'],
+          desc: 'Production-style EKS cluster provisioned using Terraform VPC and EKS modules with remote state in S3 + DynamoDB locking.',
+          slug: 'eks-terraform',
+          done: false,
+        },
+      ].map((project) => (
+        <a
+          href={`/projects/${project.slug}`}
+          class="group border border-[#30363d] rounded-lg p-6 bg-[#161b22] hover:border-[#00ff88] transition-colors block"
+        >
+          <div class="flex items-start justify-between mb-3">
+            <h3 class="font-semibold text-[#e6edf3] group-hover:text-[#00ff88] transition-colors leading-tight">
+              {project.title}
+            </h3>
+            {!project.done && (
+              <span class="ml-3 shrink-0 px-2 py-0.5 text-xs font-mono bg-[#00ff8820] text-[#00ff88] border border-[#00ff8840] rounded">
+                in progress
+              </span>
+            )}
+          </div>
+          <p class="text-[#8b949e] text-sm mb-4 leading-relaxed">{project.desc}</p>
+          <div class="flex flex-wrap gap-2">
+            {project.tags.map((tag) => (
+              <span class="px-2 py-0.5 text-xs font-mono text-[#8b949e] border border-[#30363d] rounded">
+                {tag}
+              </span>
+            ))}
+          </div>
+        </a>
+      ))}
+    </div>
+  </section>
+
+  <!-- Contact -->
+  <section id="contact" class="max-w-5xl mx-auto px-6 py-16 border-t border-[#30363d]">
+    <p class="font-mono text-[#00ff88] text-sm mb-2 tracking-widest uppercase">$ ./contact.sh</p>
+    <h2 class="text-3xl font-bold mb-4">Let's Connect</h2>
+    <p class="text-[#8b949e] mb-8 max-w-lg">
+      Open to Platform Engineering and DevOps roles. Bangalore-based, targeting 10–15 LPA by Sep 2026.
+    </p>
+    <div class="flex flex-wrap gap-4">
+      <a
+        href="mailto:sandeeprn1998@gmail.com"
+        class="flex items-center gap-2 px-5 py-3 border border-[#30363d] rounded font-mono text-sm text-[#e6edf3] hover:border-[#00ff88] hover:text-[#00ff88] transition-colors"
+      >
+        <span>📧</span> sandeeprn1998@gmail.com
+      </a>
+      <a
+        href="https://github.com/sandeeprn"
+        target="_blank"
+        rel="noopener"
+        class="flex items-center gap-2 px-5 py-3 border border-[#30363d] rounded font-mono text-sm text-[#e6edf3] hover:border-[#00ff88] hover:text-[#00ff88] transition-colors"
+      >
+        <span>🐙</span> GitHub
+      </a>
+      <a
+        href="https://linkedin.com/in/sandeeprn"
+        target="_blank"
+        rel="noopener"
+        class="flex items-center gap-2 px-5 py-3 border border-[#30363d] rounded font-mono text-sm text-[#e6edf3] hover:border-[#00ff88] hover:text-[#00ff88] transition-colors"
+      >
+        <span>💼</span> LinkedIn
+      </a>
+    </div>
+  </section>
+</Layout>
