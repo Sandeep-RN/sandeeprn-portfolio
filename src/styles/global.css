@@ -68,3 +68,10 @@ pre.astro-code,
 pre.astro-code span {
   background-color: transparent !important;
 }
+
+/* Box-drawing characters (U+2500-U+257F) need a font that includes them.
+   Google Fonts may subset JetBrains Mono and drop that range. Fira Code
+   ships the full box-drawing set and is explicitly loaded from Google Fonts. */
+pre.astro-code {
+  font-family: 'Fira Code', 'JetBrains Mono', 'Cascadia Code', 'Cascadia Mono', 'Consolas', ui-monospace, monospace;
+}
