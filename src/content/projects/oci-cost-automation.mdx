@@ -131,26 +131,25 @@ Post-deletion apply email shows actual deleted count, skipped (held) count, and 
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
-│                OCI (8+ Regions, 20+ Compartments)             │
-│                                                              │
+│              OCI (8+ Regions, 20+ Compartments)              │
 │  Boot Volumes (161 unattached)  Block Volumes (13 unattached)│
-└────────────────────────┬─────────────────────────────────────┘
-                         │ OCI Python SDK
-                         ▼
+└──────────────────────────────┬───────────────────────────────┘
+                               │ OCI Python SDK
+                               ▼
 ┌──────────────────────────────────────────────────────────────┐
-│                  Python Automation                            │
+│                      Python Automation                       │
 │                                                              │
-│  ┌────────────┐   ┌──────────────┐   ┌────────────────────┐ │
-│  │  Discovery  │   │ Safety Gates │   │   Cost Calculation  │ │
-│  │ All regions │ → │ Hold tags    │ → │ $0.0425/GB-month   │ │
-│  │ All compts  │   │ Expiry parse │   │ Per-compartment    │ │
-│  └────────────┘   └──────────────┘   └────────────────────┘ │
+│  ┌───────────┐   ┌────────────┐   ┌─────────────────┐        │
+│  │ Discovery │   │Safety Gates│   │Cost Calculation │        │
+│  │All regions│ → │ Hold tags  │ → │$0.0425/GB-month │        │
+│  │All compts │   │Expiry parse│   │ Per-compartment │        │
+│  └───────────┘   └────────────┘   └─────────────────┘        │
 │                                                              │
-│  ┌────────────┐   ┌──────────────┐   ┌────────────────────┐ │
-│  │    Plan     │   │    Apply     │   │    Email Report     │ │
-│  │ CSV + JSON  │ → │ Delete + log │ → │ HTML + Excel       │ │
-│  │ Review step │   │ Verified del │   │ Executive summary  │ │
-│  └────────────┘   └──────────────┘   └────────────────────┘ │
+│  ┌───────────┐   ┌────────────┐   ┌─────────────────┐        │
+│  │   Plan    │   │   Apply    │   │  Email Report   │        │
+│  │CSV + JSON │ → │Delete + log│ → │  HTML + Excel   │        │
+│  │Review step│   │Verified del│   │Executive summary│        │
+│  └───────────┘   └────────────┘   └─────────────────┘        │
 └──────────────────────────────────────────────────────────────┘
 ```
 
