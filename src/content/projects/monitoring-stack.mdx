@@ -1,6 +1,6 @@
 ---
 title: "Monitoring Stack: Zabbix Migration & Automation"
-description: "Led Zabbix 4 → 7 migration across 4 customer categories with zero monitoring gaps. Built Python automation eliminating ~10 hrs/week of manual reporting across 1000+ servers."
+description: "Led Zabbix 4 → 7 migration across multiple internal cloud teams with zero monitoring gaps. Built Python automation eliminating ~10 hrs/week of manual reporting across 1000+ servers."
 tags: ["Zabbix", "Python", "Ansible", "Prometheus", "Grafana", "Observability"]
 status: "done"
 date: "2024-12"
@@ -8,7 +8,7 @@ date: "2024-12"
 
 ## Overview
 
-This is production observability work at SymphonyAI — not a home lab. The scope covers **1000+ servers** across Azure and OCI, **four customer categories** (GOLD, CatPlan, CCR, Ninja), and a full Zabbix 4 → 7 migration executed with zero monitoring blind spots during cutover.
+This is production observability work at SymphonyAI — not a home lab. The scope covers **1000+ servers** across Azure and OCI, **four internal cloud-team categories**, and a full Zabbix 4 → 7 migration executed with zero monitoring blind spots during cutover.
 
 The Python automation suite I built against the Zabbix API eliminated approximately **10 hours/week** of manual reporting work.
 
@@ -111,18 +111,18 @@ Idempotent Ansible playbook deploying Zabbix 7 agent across the Linux fleet. Red
 
 ## Python Automation: 10 hrs/week Eliminated
 
-### Monthly Utilisation Reports (4 Customer Categories)
+### Monthly Utilisation Reports (4 Internal Cloud Teams)
 
-The biggest toil item: hand-collecting CPU and memory stats per host, categorising by customer, formatting into Excel. I automated the full pipeline.
+The biggest toil item: hand-collecting CPU and memory stats per host, categorising by team, formatting into Excel. I automated the full pipeline.
 
-**Host categorisation** — 40+ hostname patterns per category, matched in Python to sort 1000+ hosts into the right customer bucket automatically:
+**Host categorisation** — 40+ hostname patterns per team, matched in Python to sort 1000+ hosts into the right bucket automatically:
 
 ```python
-CATEGORY_PATTERNS = {
-    'GOLD': ['gold', 'OCI', 'InVivo', 'RMIR1', 'AlertLogic', 'Zabbix servers', ...],  # 40 patterns
-    'CatPlan': ['catplan', 'cp-sql', 'abs-cp', 'Safeway', 'Petrobras', ...],            # 45 patterns
-    'CCR': ['SRAI', 'Ayasdi', 'Crescendo', 'EurekaSDK', ...],                          # 18 patterns
-    'Ninja': []  # catch-all
+TEAM_PATTERNS = {
+    'Team A': ['prefix-a', 'svc-a', 'a-prod', ...],   # 40 patterns
+    'Team B': ['prefix-b', 'svc-b', 'b-prod', ...],   # 45 patterns
+    'Team C': ['prefix-c', 'svc-c', ...],             # 18 patterns
+    'Team D': []  # catch-all
 }
 ```
 
@@ -146,7 +146,7 @@ trend_data = zabbix_api.trend.get(
 | Memory | < 50% | > 80% |
 | Storage | — | > 2 TB flagged |
 
-Output: Four Excel workbooks per month — `Gold_Utilization_Report.xlsx`, `Catplan_Utilization_Report.xlsx`, `CCR_Utilization_Report.xlsx`, `Ninja_Utilization_Report.xlsx`.
+Output: four Excel workbooks per month — one per internal cloud team.
 
 ### Unresolved Alert Digest
 
@@ -154,7 +154,7 @@ Daily automated report of open Zabbix problems by severity (Average, High, Disas
 
 ### Failed Agent Tracking
 
-Script to identify disabled/unreachable Zabbix agents across all customer categories — catches agent drift before it causes monitoring blind spots. Outputs CSV with agent name, status, and last-seen timestamp.
+Script to identify disabled/unreachable Zabbix agents across all teams — catches agent drift before it causes monitoring blind spots. Outputs CSV with agent name, status, and last-seen timestamp.
 
 ---
 
@@ -171,7 +171,7 @@ Script to identify disabled/unreachable Zabbix agents across all customer catego
               │    Zabbix 7.2      │        │    Prometheus        │
               │  1000+ hosts       │        │  Kubernetes metrics  │
               │  15k+ URL checks   │        │  node-exporter       │
-              │  4 customer groups │        └──────────┬──────────┘
+              │  4 internal teams  │        └──────────┬──────────┘
               └──────────┬─────────┘                   │
                          └─────────────┬───────────────┘
                                        ▼

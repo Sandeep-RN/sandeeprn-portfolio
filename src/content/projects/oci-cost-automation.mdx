@@ -1,7 +1,7 @@
 ---
 title: "OCI Cloud Cost Automation"
 description: "Built automated detection and cleanup of unattached OCI volumes across 20+ customer compartments and 8+ regions, identifying $378/month ($4,536/year) in cloud waste."
-tags: ["Python", "OCI", "Cloud Cost", "Automation", "Multi-tenant"]
+tags: ["Python", "OCI", "Cloud Cost", "Automation", "Multi-tenant", "Cron", "IAM"]
 status: "done"
 date: "2025-12"
 ---
@@ -156,6 +156,35 @@ Post-deletion apply email shows actual deleted count, skipped (held) count, and 
 
 ---
 
+## Weekly Scheduled Run
+
+This isn't a one-time script — it runs autonomously every week via cron on an OCI compute instance using **Instance Principals** (no stored credentials):
+
+| Day | Time (IST) | Action |
+|---|---|---|
+| Saturday | 12:00 | **Plan** — full scan, candidates written, pre-delete email sent |
+| Sunday | 12:00 | **Apply** — deletes only candidates past their 24h review window (fast-apply mode, skips full re-scan) |
+
+```sh
+# crontab -e (CRON_TZ=Asia/Kolkata)
+0 12 * * 6 sh .../bin/plan.sh   >> .../logs/cron_plan.out 2>&1   # Saturday: plan
+0 12 * * 0 sh .../bin/apply.sh  >> .../logs/cron_apply.out 2>&1  # Sunday: apply
+```
+
+**Why a 24-hour gap between plan and apply?** It gives the ops team a full day to review the email report and add a `cleanup_hold=true` tag to anything that shouldn't be deleted — before the apply job ever runs. The apply step also re-verifies each volume is still unattached at execution time, since state can change during the window.
+
+**IAM model** — a dynamic group scoped to the cleanup instance, with policies limited to exactly what's needed:
+
+```
+allow dynamic-group cleanup_instances to read compartments in tenancy
+allow dynamic-group cleanup_instances to manage volume-family in tenancy
+allow dynamic-group cleanup_instances to use compute-volume-attachments in tenancy
+```
+
+No long-lived API keys on the box — if the instance is compromised, the blast radius is scoped to volume management, nothing else.
+
+---
+
 ## What This Demonstrates
 
 - **Real cost impact** — $378/month identified is an actual business number from OCI Cloud Advisor, not estimated.
@@ -163,3 +192,5 @@ Post-deletion apply email shows actual deleted count, skipped (held) count, and 
 - **Production safety discipline** — plan/apply separation, hold tags, per-volume re-verification before deletion. This is how you build automation ops teams trust to run unsupervised.
 - **Executive-level reporting** — the output is built for a manager to approve, not just for an engineer to read.
 - **OCI SDK depth** — BlockstorageClient, ComputeClient, IdentityClient, compartment hierarchy traversal, region enumeration.
+- **Runs unattended** — weekly cron with Instance Principals auth (no stored credentials), plan/apply separated by a 24h human-review window.
+- **Least-privilege IAM** — dynamic group scoped to exactly the permissions the job needs, nothing more.
