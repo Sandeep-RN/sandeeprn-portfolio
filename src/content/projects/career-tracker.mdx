@@ -1,4 +1,4 @@
----
+﻿---
 title: "Career Tracker App"
 description: "Full-stack career tracking application — FastAPI backend on Oracle Cloud Free Tier, React frontend, deployed at sandeeprn.in/tracker."
 tags: ["FastAPI", "React", "Python", "OCI", "Full-Stack", "Docker"]
@@ -16,30 +16,30 @@ A personal full-stack project that solves a real problem: tracking job applicati
 ## Architecture
 
 ```
-┌────────────────────────────────────────────────────┐
-│                sandeeprn.in/tracker                │
-│                                                    │
-│  ┌──────────────────────────────────────────────┐  │
-│  │            React Frontend (Vite)             │  │
-│  │  Job Board · Cert Progress · Skill Timeline  │  │
-│  └─────────────────┬────────────────────────────┘  │
-│                    │ REST API                      │
-└────────────────────┼───────────────────────────────┘
-                     │
-┌────────────────────┼───────────────────────────────┐
-│          Oracle Cloud Free Tier (ARM VM)           │
-│                    │                               │
-│  ┌─────────────────▼────────────────────────────┐  │
-│  │               FastAPI (Python)               │  │
-│  │    /applications  /certs  /skills  /stats    │  │
-│  └─────────────────┬────────────────────────────┘  │
-│                    │                               │
-│  ┌─────────────────▼────────────────────────────┐  │
-│  │       SQLite (dev) → PostgreSQL (prod)       │  │
-│  └──────────────────────────────────────────────┘  │
-│                                                    │
-│  Docker Compose · Nginx reverse proxy · HTTPS      │
-└────────────────────────────────────────────────────┘
++----------------------------------------------------+
+|                sandeeprn.in/tracker                |
+|                                                    |
+|  +----------------------------------------------+  |
+|  |            React Frontend (Vite)             |  |
+|  |  Job Board · Cert Progress · Skill Timeline  |  |
+|  +-----------------+----------------------------+  |
+|                    | REST API                      |
++--------------------+-------------------------------+
+                     |
++--------------------+-------------------------------+
+|          Oracle Cloud Free Tier (ARM VM)           |
+|                    |                               |
+|  +-----------------v----------------------------+  |
+|  |               FastAPI (Python)               |  |
+|  |    /applications  /certs  /skills  /stats    |  |
+|  +-----------------+----------------------------+  |
+|                    |                               |
+|  +-----------------v----------------------------+  |
+|  |       SQLite (dev) → PostgreSQL (prod)       |  |
+|  +----------------------------------------------+  |
+|                                                    |
+|  Docker Compose · Nginx reverse proxy · HTTPS      |
++----------------------------------------------------+
 ```
 
 ## Backend: FastAPI

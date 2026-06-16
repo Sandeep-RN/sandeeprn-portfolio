@@ -1,4 +1,4 @@
----
+﻿---
 title: "Docker Multi-Service App → ECR"
 description: "Multi-service application containerized with Docker and pushed to Amazon ECR with proper image tagging and lifecycle policies."
 tags: ["Docker", "AWS ECR", "Containerization", "AWS"]
@@ -14,25 +14,25 @@ This project demonstrates containerizing a multi-service application using Docke
 ## Architecture
 
 ```
-┌────────────────────────────────────────────┐
-│             Local Development              │
-│                                            │
-│  ┌──────────┐   ┌──────────┐   ┌─────────┐ │
-│  │ Service A│   │ Service B│   │  Nginx  │ │
-│  │(FastAPI) │   │(Worker)  │   │(Proxy)  │ │
-│  └────┬─────┘   └────┬─────┘   └────┬────┘ │
-│      └──────────────┴──────────────┘       │
-│               docker-compose               │
-└─────────────────────┬──────────────────────┘
-                      │ docker build + tag
-                      ▼
-┌────────────────────────────────────────────┐
-│            Amazon ECR (Private)            │
-│                                            │
-│  sandeeprn/service-a:latest                │
-│  sandeeprn/service-a:1.0.0                 │
-│  sandeeprn/service-b:latest                │
-└────────────────────────────────────────────┘
++--------------------------------------------+
+|             Local Development              |
+|                                            |
+|  +----------+   +----------+   +---------+ |
+|  | Service A|   | Service B|   |  Nginx  | |
+|  |(FastAPI) |   |(Worker)  |   |(Proxy)  | |
+|  +----+-----+   +----+-----+   +----+----+ |
+|      +--------------+--------------+       |
+|               docker-compose               |
++---------------------+----------------------+
+                      | docker build + tag
+                      v
++--------------------------------------------+
+|            Amazon ECR (Private)            |
+|                                            |
+|  sandeeprn/service-a:latest                |
+|  sandeeprn/service-a:1.0.0                 |
+|  sandeeprn/service-b:latest                |
++--------------------------------------------+
 ```
 
 ## Key Steps
