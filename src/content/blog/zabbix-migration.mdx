@@ -1,0 +1,136 @@
+---
+title: "Zero-Gap Zabbix 4 → 7 Migration at Scale"
+description: "How I migrated 15,000+ URL checks and 1000+ servers from Zabbix 4 to Zabbix 7 without a single monitoring blind spot during cutover."
+tags: ["Zabbix", "Observability", "Migration", "Python", "Ansible"]
+date: "2025-06-01"
+---
+
+Most monitoring migrations go like this: export what you can, import into the new system, switch over, and spend the next week chasing gaps. We couldn't afford that. Our Zabbix instance covers **1000+ servers** across Azure and OCI for multiple enterprise customers — a monitoring gap means missed downtime, missed SLA, and a very uncomfortable phone call.
+
+Here's how I executed a zero-gap migration from Zabbix 4 to Zabbix 7.
+
+---
+
+## Why migrate at all?
+
+Zabbix 4 had been running for years. The templates were inconsistent — each team had added custom items and triggers over time with no naming standards. Host groups overlapped. Web scenario check intervals were all over the place. And Zabbix 7 offered genuine improvements: better UI, improved performance, and smarter trigger dependency handling.
+
+The migration wasn't optional. The question was how to do it safely.
+
+---
+
+## The inventory problem
+
+Before touching anything, I needed to understand what we actually had. The instinct is to export everything and import it into the new instance. The problem: Zabbix templates are applied at the host level, and the *custom* items and triggers — the ones teams added manually on top of templates — don't travel with a standard host export.
+
+I wrote a Python script using `pyzabbix` to extract only the non-inherited items and triggers per host:
+
+```python
+for host in all_hosts:
+    custom_items = api.item.get(
+        hostids=host['hostid'],
+        inherited=False,  # custom only — not from templates
+        output=['itemid', 'name', 'key_', 'type', 'status', 'delay']
+    )
+    custom_triggers = api.trigger.get(
+        hostids=host['hostid'],
+        inherited=False,
+        output=['triggerid', 'description', 'expression', 'priority']
+    )
+```
+
+Running this across all 1000+ hosts (with a `[N/M]` progress counter — these runs take a while) gave me a complete picture of institutional knowledge baked into the old instance that a standard export would have silently dropped.
+
+---
+
+## Running both instances in parallel
+
+The key decision: **don't decommission the old instance until the new one is validated**.
+
+I ran Zabbix 4 and Zabbix 7 side by side during the migration window. For each team's host group, the process was:
+
+1. Import hosts into Zabbix 7 via API (automated, CSV-driven)
+2. Validate trigger counts match between old and new
+3. Only then remove hosts from Zabbix 4
+
+```python
+# Validate parity before cutover
+old_trigger_count = len(api_v4.trigger.get(hostids=host_id))
+new_trigger_count = len(api_v7.trigger.get(hostids=host_id))
+
+if old_trigger_count != new_trigger_count:
+    print(f"[MISMATCH] {hostname}: {old_trigger_count} vs {new_trigger_count}")
+    # flag for manual review — do not proceed
+```
+
+No host was removed from Zabbix 4 until the new instance showed matching trigger counts.
+
+---
+
+## Upgrading the alerting while we were at it
+
+The old Zabbix 4 web scenario triggers only checked HTTP response codes:
+
+```
+last(/hostname/web.test.rspcode[scenario,step])<>200
+```
+
+This has a silent failure mode: if the Zabbix agent itself goes down, the check stops firing — and you get no alert. The trigger evaluates false (no data = no mismatch), so you're blind.
+
+I upgraded all 15,000+ URL check triggers to also alert on data timeout:
+
+```python
+new_expr = re.sub(
+    r'(last\(/[^/]+/web\.test\.rspcode\[.*?\]\))<>200',
+    r'\1<>200 or nodata(\1,600)=1',
+    old_expression
+)
+```
+
+This single change meant that a dead agent is now as visible as a 500 error. That's a real observability improvement, not just a migration.
+
+---
+
+## Ansible for agent rollout
+
+Deploying the Zabbix 7 agent across the fleet manually would take days. Idempotent Ansible playbook, run it once:
+
+```yaml
+- name: Deploy Zabbix 7 Agent
+  hosts: all
+  become: yes
+  tasks:
+    - name: Copy agent config
+      copy:
+        src: zabbix_agentd.conf
+        dest: /etc/zabbix/zabbix_agentd.conf
+        owner: root
+        mode: '0644'
+    - name: Install agent
+      script: z_agent.sh
+      args:
+        creates: /usr/sbin/zabbix_agentd  # idempotent — skip if already installed
+```
+
+Per-server onboarding went from ~30 minutes to under 2 minutes.
+
+---
+
+## What zero-gap actually means
+
+"Zero monitoring gaps" is a claim that needs evidence. Here's how I verified it:
+
+- **Trigger count parity** — checked before every host cutover
+- **URL check continuity** — compared active httptest counts before and after each team's migration
+- **Parallel window** — both instances ran simultaneously; any gap in Zabbix 7 was caught by Zabbix 4 still watching
+
+After full cutover, we ran both instances for an additional two weeks before decommissioning Zabbix 4. No incidents during that period were missed or delayed due to monitoring gaps.
+
+---
+
+## Key takeaways
+
+1. **Export custom items explicitly** — standard host exports miss them. Script it.
+2. **Parallel validation beats hard cutover** — slower, but the only way to guarantee no gaps.
+3. **Migrations are an opportunity** — the `nodata()` trigger upgrade improved our alerting posture, not just our Zabbix version.
+4. **Ansible at fleet scale** — if you're SSH-ing into servers one at a time to deploy agents, you're doing it wrong.
