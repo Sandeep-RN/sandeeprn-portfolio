@@ -1,4 +1,4 @@
----
+﻿---
 title: "Monitoring Stack: Zabbix Migration & Automation"
 description: "Led Zabbix 4 → 7 migration across multiple internal cloud teams with zero monitoring gaps. Built Python automation eliminating ~10 hrs/week of manual reporting across 1000+ servers."
 tags: ["Zabbix", "Python", "Ansible", "Prometheus", "Grafana", "Observability"]
@@ -161,33 +161,33 @@ Script to identify disabled/unreachable Zabbix agents across all teams — catch
 ## Architecture
 
 ```
-┌───────────────────────────────────────────────────────────────────┐
-│                  Infrastructure (1000+ servers)                   │
-│           Azure VMs · OCI Compute · Kubernetes Nodes              │
-└────┬────────────────────────┬─────────────────────────────────────┘
-    │ Zabbix Agent (port 10050)   │ Prometheus exporter
-    ▼                              ▼
-    ┌───────────────────┐        ┌───────────────────┐
-    │    Zabbix 7.2     │        │    Prometheus     │
-    │    1000+ hosts    │        │Kubernetes metrics │
-    │  15k+ URL checks  │        │   node-exporter   │
-    │ 4 internal teams  │        └───┬───────────────┘
-    └───┬───────────────┘             │
-        └─────────────┬──────────────┘
-                      ▼
-             ┌──────────────────┐
-             │     Grafana      │
-             │Unified dashboards│
-             │   SLA tracking   │
-             └──────────────────┘
-                      │
-                      ▼
-          ┌─────────────────────────┐
-          │    Python Automation    │
-          │   Zabbix API JSON-RPC   │
-          │  Monthly Excel reports  │
-          │   Daily alert digests   │
-          └─────────────────────────┘
++-------------------------------------------------------------------+
+|                  Infrastructure (1000+ servers)                   |
+|           Azure VMs · OCI Compute · Kubernetes Nodes              |
++----+------------------------+-------------------------------------+
+    | Zabbix Agent (port 10050)   | Prometheus exporter
+    v                              v
+    +-------------------+        +-------------------+
+    |    Zabbix 7.2     |        |    Prometheus     |
+    |    1000+ hosts    |        |Kubernetes metrics |
+    |  15k+ URL checks  |        |   node-exporter   |
+    | 4 internal teams  |        +---+---------------+
+    +---+---------------+             |
+        +-------------+--------------+
+                      v
+             +------------------+
+             |     Grafana      |
+             |Unified dashboards|
+             |   SLA tracking   |
+             +------------------+
+                      |
+                      v
+          +-------------------------+
+          |    Python Automation    |
+          |   Zabbix API JSON-RPC   |
+          |  Monthly Excel reports  |
+          |   Daily alert digests   |
+          +-------------------------+
 ```
 
 ---

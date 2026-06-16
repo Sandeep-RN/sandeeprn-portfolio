@@ -1,4 +1,4 @@
----
+﻿---
 title: "OCI Cloud Cost Automation"
 description: "Built automated detection and cleanup of unattached OCI volumes across 20+ customer compartments and 8+ regions, identifying $378/month ($4,536/year) in cloud waste."
 tags: ["Python", "OCI", "Cloud Cost", "Automation", "Multi-tenant", "Cron", "IAM"]
@@ -130,27 +130,27 @@ Post-deletion apply email shows actual deleted count, skipped (held) count, and 
 ## Architecture
 
 ```
-┌──────────────────────────────────────────────────────────────┐
-│              OCI (8+ Regions, 20+ Compartments)              │
-│  Boot Volumes (161 unattached)  Block Volumes (13 unattached)│
-└──────────────────────────────┬───────────────────────────────┘
-                               │ OCI Python SDK
-                               ▼
-┌──────────────────────────────────────────────────────────────┐
-│                      Python Automation                       │
-│                                                              │
-│  ┌───────────┐   ┌────────────┐   ┌─────────────────┐        │
-│  │ Discovery │   │Safety Gates│   │Cost Calculation │        │
-│  │All regions│ → │ Hold tags  │ → │$0.0425/GB-month │        │
-│  │All compts │   │Expiry parse│   │ Per-compartment │        │
-│  └───────────┘   └────────────┘   └─────────────────┘        │
-│                                                              │
-│  ┌───────────┐   ┌────────────┐   ┌─────────────────┐        │
-│  │   Plan    │   │   Apply    │   │  Email Report   │        │
-│  │CSV + JSON │ → │Delete + log│ → │  HTML + Excel   │        │
-│  │Review step│   │Verified del│   │Executive summary│        │
-│  └───────────┘   └────────────┘   └─────────────────┘        │
-└──────────────────────────────────────────────────────────────┘
++--------------------------------------------------------------+
+|              OCI (8+ Regions, 20+ Compartments)              |
+|  Boot Volumes (161 unattached)  Block Volumes (13 unattached)|
++------------------------------+-------------------------------+
+                               | OCI Python SDK
+                               v
++--------------------------------------------------------------+
+|                      Python Automation                       |
+|                                                              |
+|  +-----------+   +------------+   +-----------------+        |
+|  | Discovery |   |Safety Gates|   |Cost Calculation |        |
+|  |All regions| → | Hold tags  | → |$0.0425/GB-month |        |
+|  |All compts |   |Expiry parse|   | Per-compartment |        |
+|  +-----------+   +------------+   +-----------------+        |
+|                                                              |
+|  +-----------+   +------------+   +-----------------+        |
+|  |   Plan    |   |   Apply    |   |  Email Report   |        |
+|  |CSV + JSON | → |Delete + log| → |  HTML + Excel   |        |
+|  |Review step|   |Verified del|   |Executive summary|        |
+|  +-----------+   +------------+   +-----------------+        |
++--------------------------------------------------------------+
 ```
 
 ---
