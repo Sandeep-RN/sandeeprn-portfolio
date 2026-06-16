@@ -62,8 +62,18 @@ import Layout from '../layouts/Layout.astro';
   <section class="max-w-5xl mx-auto px-6 py-16 border-t border-[#30363d]">
     <p class="font-mono text-[#00ff88] text-sm mb-2 tracking-widest uppercase">$ cat about.md</p>
     <h2 class="text-3xl font-bold mb-8">About</h2>
-    <div class="grid md:grid-cols-3 gap-10">
-      <div class="md:col-span-2 space-y-4 text-[#8b949e] leading-relaxed">
+    <div class="grid md:grid-cols-4 gap-10 items-start">
+      <!-- Photo -->
+      <div class="flex justify-center md:justify-start">
+        <div class="relative">
+          <div class="w-36 h-36 rounded-full overflow-hidden border-2 border-[#30363d] ring-4 ring-[#00ff88]/10">
+            <img src="/avatar.jpg" alt="Sandeep R N" class="w-full h-full object-cover object-top" />
+          </div>
+          <div class="absolute -bottom-1 -right-1 w-5 h-5 bg-[#00ff88] rounded-full border-2 border-[#0d1117]" title="Open to work"></div>
+        </div>
+      </div>
+
+      <div class="md:col-span-2 space-y-4 text-[#8b949e] leading-relaxed md:col-start-2">
         <p>
           I build the automation and tooling that keeps production reliable at scale.
           At SymphonyAI, that means owning observability across a

@@ -1,0 +1,63 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import { getCollection, render } from 'astro:content';
+
+export async function getStaticPaths() {
+  const posts = await getCollection('blog');
+  return posts.map((post) => ({
+    params: { slug: post.id },
+    props: { post },
+  }));
+}
+
+const { post } = Astro.props;
+const { Content } = await render(post);
+---
+
+<Layout title={`${post.data.title} — Sandeep R N`} description={post.data.description}>
+  <div class="max-w-3xl mx-auto px-6 py-16">
+    <!-- Breadcrumb -->
+    <div class="font-mono text-sm text-[#8b949e] mb-8">
+      <a href="/" class="hover:text-[#00ff88] transition-colors">~</a>
+      <span class="mx-2">/</span>
+      <a href="/blog" class="hover:text-[#00ff88] transition-colors">blog</a>
+      <span class="mx-2">/</span>
+      <span class="text-[#e6edf3]">{post.id}</span>
+    </div>
+
+    <!-- Header -->
+    <div class="mb-10">
+      <p class="font-mono text-xs text-[#8b949e] mb-3">
+        {new Date(post.data.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
+      </p>
+      <h1 class="text-4xl font-bold text-[#e6edf3] mb-6 leading-tight">{post.data.title}</h1>
+      <div class="flex flex-wrap gap-2">
+        {post.data.tags.map((tag: string) => (
+          <span class="px-3 py-1 bg-[#0d1117] border border-[#30363d] rounded text-[#8b949e] text-sm font-mono">
+            {tag}
+          </span>
+        ))}
+      </div>
+    </div>
+
+    <!-- Content -->
+    <div class="prose prose-invert prose-pre:bg-[#0d1117] prose-pre:border prose-pre:border-[#30363d] prose-code:text-[#00ff88] prose-code:bg-[#0d1117] prose-code:px-1 prose-code:rounded prose-headings:text-[#e6edf3] prose-a:text-[#00ff88] prose-hr:border-[#30363d] max-w-none">
+      <Content />
+    </div>
+
+    <!-- Footer -->
+    <div class="mt-16 pt-8 border-t border-[#30363d] flex items-center justify-between">
+      <a href="/blog" class="font-mono text-sm text-[#8b949e] hover:text-[#00ff88] transition-colors">
+        ← back to blog
+      </a>
+      <a
+        href="https://www.linkedin.com/in/sandeep-rn/"
+        target="_blank"
+        rel="noopener"
+        class="font-mono text-sm text-[#8b949e] hover:text-[#00ff88] transition-colors"
+      >
+        Connect on LinkedIn →
+      </a>
+    </div>
+  </div>
+</Layout>

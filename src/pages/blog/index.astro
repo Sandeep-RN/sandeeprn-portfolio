@@ -1,0 +1,59 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import { getCollection } from 'astro:content';
+
+const posts = await getCollection('blog');
+const sorted = posts.sort((a, b) => new Date(b.data.date).getTime() - new Date(a.data.date).getTime());
+
+const tagColors: Record<string, string> = {
+  'Zabbix': '#f59e0b',
+  'Observability': '#06b6d4',
+  'Python': '#3b82f6',
+  'OCI': '#f80000',
+  'Ansible': '#ef4444',
+  'Migration': '#8b5cf6',
+  'Cloud Cost': '#10b981',
+  'Automation': '#00ff88',
+};
+---
+
+<Layout title="Blog — Sandeep R N" description="Technical write-ups on SRE, Platform Engineering, observability, and cloud automation.">
+  <div class="max-w-5xl mx-auto px-6 py-16">
+    <p class="font-mono text-[#00ff88] text-sm mb-2 tracking-widest uppercase">$ ls ./blog</p>
+    <h1 class="text-4xl font-bold mb-3">Blog</h1>
+    <p class="text-[#8b949e] mb-12 max-w-xl">
+      Technical write-ups from real production work — not tutorials, not theory.
+    </p>
+
+    <div class="space-y-6">
+      {sorted.map((post) => (
+        <a
+          href={`/blog/${post.id}`}
+          class="group block border border-[#30363d] rounded-lg p-6 bg-[#161b22] hover:border-[#00ff88] transition-colors"
+        >
+          <div class="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
+            <div class="flex-1">
+              <h2 class="text-xl font-semibold text-[#e6edf3] group-hover:text-[#00ff88] transition-colors mb-2 leading-snug">
+                {post.data.title}
+              </h2>
+              <p class="text-[#8b949e] text-sm leading-relaxed mb-4">{post.data.description}</p>
+              <div class="flex flex-wrap gap-2">
+                {post.data.tags.map((tag: string) => (
+                  <span
+                    class="px-2 py-0.5 text-xs font-mono rounded border"
+                    style={`color: ${tagColors[tag] ?? '#8b949e'}; border-color: ${tagColors[tag] ?? '#30363d'}44; background-color: ${tagColors[tag] ?? '#8b949e'}11;`}
+                  >
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            </div>
+            <div class="shrink-0 font-mono text-xs text-[#8b949e] md:text-right">
+              {new Date(post.data.date).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })}
+            </div>
+          </div>
+        </a>
+      ))}
+    </div>
+  </div>
+</Layout>

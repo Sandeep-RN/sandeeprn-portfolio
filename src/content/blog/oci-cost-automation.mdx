@@ -1,0 +1,165 @@
+---
+title: "Finding $4,500/year in OCI Cloud Waste with Python"
+description: "How I built automated detection and cleanup of unattached OCI volumes across 20+ customer compartments — and why the safety gates matter as much as the detection."
+tags: ["OCI", "Python", "Cloud Cost", "Automation"]
+date: "2025-12-01"
+---
+
+Cloud waste is quiet. There's no alert when an unattached volume sits idle for six months. No dashboard that says "this is costing you money for no reason." It just accumulates — a few dollars here, a few there — until someone runs a report and winces.
+
+At SymphonyAI, that report was OCI Cloud Advisor. What it surfaced: **161 unattached boot volumes** and **13 unattached block volumes** across 20+ customer compartments. Total waste: **$378.10/month, $4,536/year**.
+
+The root cause was straightforward: our Vulnerability Assessment (VA) remediation process automatically creates boot volume snapshots before patching. Nobody had built a cleanup process. So they just sat there.
+
+Here's how I fixed it with Python.
+
+---
+
+## The scale problem
+
+If this was one compartment in one region, you'd fix it manually. Our environment spans:
+- **8+ regions** — US, EU, APAC
+- **20+ customer compartments** — each with their own naming conventions and tagging habits
+- **Hundreds of volumes** created, modified, and deleted continuously
+
+Manual cleanup isn't a process, it's a one-time event. I needed automation that runs on schedule and is safe enough to trust unsupervised.
+
+---
+
+## Step 1: Find everything
+
+The OCI Python SDK lets you iterate regions and compartments programmatically. The key: you need to check `AVAILABLE` lifecycle state *and* confirm no active attachments — a volume can be `AVAILABLE` but still attached.
+
+```python
+def get_unattached_volumes(block_client, compute_client, compartment_id):
+    volumes = block_client.list_volumes(
+        compartment_id=compartment_id,
+        lifecycle_state="AVAILABLE"
+    ).data
+
+    unattached = []
+    for vol in volumes:
+        attachments = compute_client.list_volume_attachments(
+            compartment_id=compartment_id,
+            volume_id=vol.id
+        ).data
+        if not attachments:
+            unattached.append(vol)
+    return unattached
+```
+
+For boot volumes it's the same pattern with `list_boot_volumes` and `list_boot_volume_attachments`. Run this across all compartments in all regions and you have the complete picture.
+
+---
+
+## Step 2: Don't delete things that shouldn't be deleted
+
+This is where most cleanup scripts go wrong. Not every unattached volume is waste — some are intentionally retained (DR snapshots, pre-patch backups with a defined retention window, volumes tagged for handoff to another team).
+
+I built two safety layers:
+
+**Hold tags** — if a volume has `cleanup_hold=true` or `do_not_delete=true`, it's skipped unconditionally:
+
+```python
+def is_protected(volume):
+    tags = volume.freeform_tags or {}
+    return (
+        tags.get('cleanup_hold', '').lower() == 'true' or
+        tags.get('do_not_delete', '').lower() == 'true'
+    )
+```
+
+**Expiry parsing** — volumes are often named or tagged with an intended deletion date, but teams use different formats. I wrote 6 regex patterns to catch all of them:
+
+```python
+EXPIRY_PATTERNS = [
+    r'\b(\d{8})\b',                              # 20251231
+    r'\b(\d{2})[_\-/](\d{2})[_\-/](\d{4})\b',  # 31-12-2025
+    r'\b(\d{2})[_\-/](\d{2})[_\-/](\d{2})\b',  # 31-12-25
+    r'DEL[_\-]?<(\d{8})>',                       # DEL-<20250712>
+    r'(?:EXP|EXPIRY)[_\-]?(\d+)',                # EXP20250101
+    r'Crt\((\d{2}-\d{2}-\d{2})\)',              # Crt(11-12-25)
+]
+```
+
+A volume with any recognisable expiry date in its name or tags is only deleted after that date — not before.
+
+---
+
+## Step 3: Plan before you apply
+
+The script runs in two modes: **plan** and **apply** — inspired by Terraform's workflow.
+
+Plan generates a full report with no destructive actions:
+- `snapshot_cleanup_plan.json` — complete candidate list
+- `snapshot_cleanup_candidates.csv` — volumes eligible for deletion with cost calculations
+- HTML email to the ops team with executive summary
+
+Only after a human reviews the plan and runs apply does anything get deleted. And even then, the apply step re-verifies each volume is still unattached before touching it — a volume could get attached in the window between plan and apply.
+
+```python
+def safe_delete(block_client, volume_id, volume_name):
+    # Re-verify before deletion
+    attachments = compute_client.list_volume_attachments(
+        compartment_id=compartment_id,
+        volume_id=volume_id
+    ).data
+
+    if attachments:
+        log(f"SKIP {volume_name} — now attached, skipping")
+        return False
+
+    block_client.delete_volume(volume_id)
+    log(f"DELETED {volume_name}")
+    return True
+```
+
+---
+
+## Step 4: Make the output executive-readable
+
+An ops team will run this. Their manager needs to approve it. The email report bridges that gap:
+
+```
+SUMMARY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Customer compartments scanned:  20+
+Unattached boot volumes:        161
+Unattached block volumes:         13
+Total monthly savings:      $378.10
+Estimated annual savings:   $4,536+
+
+TOP 5 BY COST
+🚨 Customer A    — $94.20/month
+🚨 Customer B    — $71.50/month
+   Customer C    — $43.80/month
+   Customer D    — $38.10/month
+   Customer E    — $31.60/month
+```
+
+The 🚨 icon flags compartments above $100/month — the ones worth escalating immediately. The rest are just context.
+
+---
+
+## The result
+
+After running plan, reviewing, and applying:
+- **174 volumes cleaned up** across 20+ compartments
+- **$378.10/month** in ongoing waste eliminated
+- **Full audit trail** — apply CSV with timestamps, volume IDs, and compartment names for every deletion
+
+The VA remediation process still creates volumes. But now there's a scheduled cleanup that finds and removes them before they accumulate. The problem is solved, not just fixed once.
+
+---
+
+## What I'd do differently
+
+**Cost rate hardcoded** — `$0.0425/GB-month` is OCI's standard block storage rate, but it varies by region and storage type. A more robust version would pull pricing from the OCI pricing API dynamically.
+
+**No Slack integration** — right now it's email only. A Slack message with the plan summary before every apply run would reduce the friction of getting approval.
+
+**Compartment hierarchy traversal** — I handle direct child compartments, but deeply nested hierarchies require recursive traversal. Not a problem for our environment, but worth noting for larger tenancies.
+
+---
+
+If you're on OCI and haven't checked your unattached volumes recently — run `oci bv volume list --lifecycle-state AVAILABLE` in your tenancy. You might be surprised.
