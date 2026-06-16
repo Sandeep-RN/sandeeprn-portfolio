@@ -1,25 +1,42 @@
 ---
-title: "Building This Site: A Case Study in Directing AI-Assisted Development"
-description: "How I built sandeeprn.in from scratch with Astro and Cloudflare Pages — the real bugs I hit, and what I learned about directing an AI coding assistant instead of just prompting it."
+title: "Beyond Vibe Coding: Directing AI to Build This Portfolio"
+description: "Vibe coding is letting AI drive and hoping for the best. This is the other thing — directing Claude Code through every decision, catching its mistakes, and owning the outcomes. The real bugs, the git rollback, and what I learned."
 tags: ["Astro", "Cloudflare", "AI-Assisted Development", "Debugging", "Meta"]
 date: "2026-06-17"
 ---
 
-This site is itself a project worth writing up. Not because the tech stack is exotic — it's Astro, Tailwind, and Cloudflare Pages, all fairly standard — but because of *how* I built it: directing Claude Code through every decision, catching its mistakes, and learning where AI assistance accelerates work versus where it needs a firm hand.
+There's a term going around right now — **vibe coding**. You describe roughly what you want, accept whatever the AI produces, and ship it without fully understanding what's in the diff. It works until it doesn't.
 
-If you're evaluating whether I can ship things independently, this is the honest version of that story — including the part where I had to roll back a commit because the AI's interpretation didn't match what was in my head.
+This site was built differently. I used Claude Code for every line of code, but I directed every decision, caught the mistakes the AI made, understood the root cause of every bug before accepting a fix, and owned the outcomes. That's a different skill, and this post is the honest case study of it — including the part where I had to roll back a commit because the AI's interpretation didn't match what was in my head.
+
+If you're evaluating whether I can ship things independently: this is the real version of that story.
 
 ---
 
-## The Brief I Gave Myself
+## Vibe Coding vs. Directing AI
 
-Domain bought, Cloudflare DNS pointed, goal: a portfolio that signals "Platform Engineer in progress" to a hiring manager within 60 seconds. Before writing code, I had Claude Code interview me — vision, target audience, projects to feature, tech stack tradeoffs. That interview phase mattered: it forced me to articulate that I wanted "growing fast" and "thinks like a platform engineer" as the two takeaways, which shaped every later decision (the certs timeline, the dark terminal aesthetic, leading project write-ups with real production numbers instead of generic descriptions).
+Vibe coding is autocomplete at scale. The AI is the driver; you're along for the ride. It's fast and it's fun, and for throwaway scripts or personal experiments it's fine.
 
-**Stack decision:** Astro + Tailwind + MDX. Static-first, ships zero JS by default, content collections for projects/blog as structured Markdown. Reasoning given to me: fast Cloudflare Pages builds, good Lighthouse scores, MDX lets project write-ups embed real code snippets without a separate CMS.
+Directing AI is closer to managing a capable but context-free contractor. They're technically strong, they'll solve the problem you *described* — but if that problem description is ambiguous, they'll solve the wrong thing and not tell you. The skill is:
+
+- Specifying precisely enough that the output matches your intent
+- Catching the gap quickly when it doesn't
+- Knowing which parts of the diff to trust and which to verify
+- Being specific about what to keep versus discard when things go sideways
+
+The diagnostic: if you can't explain *why* the AI's fix worked, you're vibing. If you can explain it, you're directing.
+
+---
+
+## The Brief
+
+Domain bought, Cloudflare DNS pointed, goal: a portfolio that signals "Platform Engineer in progress" to a hiring manager within 60 seconds. Before writing code, I had Claude Code interview me — vision, target audience, projects to feature, stack tradeoffs. That interview phase mattered: it forced me to articulate that I wanted "growing fast" and "thinks like a platform engineer" as the two takeaways, which shaped every later decision (the certs timeline, the dark terminal aesthetic, leading project write-ups with real production numbers instead of generic descriptions).
+
+**Stack decision:** Astro + Tailwind + MDX. Static-first, ships zero JS by default, content collections for projects/blog as structured Markdown. Fast Cloudflare Pages builds, good Lighthouse scores, MDX lets project write-ups embed real code snippets without a separate CMS.
 
 ## Building in Buckets
 
-Rather than one giant build-and-pray, the work was split into agile buckets — scaffold, hero/about/skills, project pages, certifications, blog, SEO — each one built, deployed to a Cloudflare Pages preview, and reviewed before moving to the next. This caught problems early: I flagged the salary-disclosure line in the contact section before it ever went live, and caught customer-name leakage in project write-ups during review rather than after the fact.
+Rather than one giant build-and-pray, the work was split into agile buckets — scaffold, hero/about/skills, project pages, certifications, blog, SEO — each one built, deployed to a Cloudflare Pages preview, and reviewed before moving to the next. This caught problems early: I flagged a salary-disclosure line in the contact section before it ever went live, and caught customer-name leakage in project write-ups during review rather than after.
 
 This is the same instinct as deploying behind a feature flag instead of pushing straight to prod — small verified increments beat one large unverified one.
 
@@ -41,31 +58,32 @@ Astro's default Shiki theme (`github-dark`) injects an **inline style** directly
 
 **Lesson on directing AI:** asking "why is this happening" instead of "make this look right" got me a root-cause fix in one pass instead of CSS patch-on-patch.
 
-### 2. ASCII diagram alignment — the "ladder" bug
+### 2. ASCII diagram alignment — two bugs, not one
 
-The architecture diagrams in my project write-ups (box-drawing characters like `┌─┐│└┘`) looked like a staircase instead of clean rectangles. I'd actually asked for these diagrams to be *removed* at one point, frustrated with the visual bug — then asked to roll that back, because I liked the diagrams and just wanted the bug fixed, not the feature deleted.
+The architecture diagrams in my project write-ups looked like a staircase instead of clean rectangles. I'd actually asked for them to be *removed* at one point, frustrated with the visual bug — then asked to roll that back, because I liked the diagrams and just wanted the bug fixed, not the feature deleted.
 
-There turned out to be two separate causes. The first was found by counting exact Unicode character lengths per line:
+There turned out to be two separate causes, found one at a time.
+
+**Bug 1 — inconsistent character counts.** By counting exact Unicode character lengths per line:
 
 ```
-47: ┌─────────────────────────────────────────────┐
-48: │              Local Development               │   ← 1 char too wide
-47: │                                             │
+47: +---------------------------------------------+
+48: |              Local Development               |   <- 1 char too wide
+47: |                                             |
 ```
 
-Lines that should have been identical width were off by 1–2 characters — hand-typed ASCII art with inconsistent padding. The fix: stop hand-aligning and instead **build each diagram programmatically**: compute exact padding with a script, verify every line length matches before writing it to the file.
+Lines that should have been identical width were off by 1–2 characters — hand-typed ASCII art with inconsistent padding. Fix: build each diagram programmatically, compute exact padding with a script, verify every line length matches before writing it to the file.
 
-The second cause was subtler and survived even after all character counts were correct. Box-drawing characters (U+2500–U+257F: `┌─┐│└┘▼`) are a separate Unicode block that fonts can omit from their subset. Google Fonts serves JetBrains Mono with a reduced character set to keep file sizes down — and that subset doesn't include box-drawing characters. So when the browser rendered the diagrams, it silently fell back to a different system font for those specific characters. That fallback font has slightly different character widths, which breaks alignment even when every line has an identical character count.
+**Bug 2 — font subsetting.** This one survived even after all character counts were correct. The original diagrams used Unicode box-drawing characters (`┌─┐│└┘`), which live in the U+2500–U+257F range. Google Fonts serves JetBrains Mono with a reduced character subset to keep file sizes small — and that subset doesn't include box-drawing characters. So the browser silently fell back to a different system font for those specific characters. That fallback font has slightly different character widths, which breaks alignment even when every line has an identical character count. The misalignment is invisible in your editor, only visible in the browser.
 
-The fix: explicitly load **Fira Code** from Google Fonts (it ships the full box-drawing range), and add a targeted CSS rule so `pre.astro-code` uses Fira Code first:
+The fix: replace all Unicode box-drawing characters with plain ASCII equivalents — `+`, `-`, `|`, `v`. ASCII characters (U+0000–U+007F) are **by definition** equal-width in any monospace font. No font can break that guarantee.
 
-```css
-pre.astro-code {
-  font-family: 'Fira Code', 'JetBrains Mono', 'Cascadia Code', ui-monospace, monospace;
-}
+```
+Before (Unicode):  ┌────────────────────┐
+After (ASCII):     +--------------------+
 ```
 
-**Lesson:** character count is a necessary condition for ASCII diagram alignment, not a sufficient one. The rendered font has to include those characters — otherwise the browser quietly substitutes a different font mid-line and the alignment breaks in a way that's invisible in your editor but visible in the browser.
+**Lesson:** character count is a necessary condition for diagram alignment, not a sufficient one. The rendered font also has to include those characters — otherwise the browser quietly substitutes a different font mid-line, and the alignment breaks in a way that's invisible in your editor but visible in the browser.
 
 ### 3. The Cloudflare `www` subdomain 522 error
 
@@ -73,25 +91,25 @@ After redirecting `www.sandeeprn.in` → `sandeeprn.in`, the www version returne
 
 ### 4. Astro 5's breaking change to content collections
 
-Midway through, `npm run build` failed with `LegacyContentConfigError` — Astro 5 moved `src/content/config.ts` to `src/content.config.ts` and requires an explicit `loader` per collection instead of just a `type`. Astro 5 also renamed `entry.slug` to `entry.id` and replaced `entry.render()` with a standalone `render(entry)` import. Three breaking changes discovered by reading the actual error messages and fixing one at a time, rather than assuming the docs I'd memorized were still current.
+Midway through, `npm run build` failed with `LegacyContentConfigError` — Astro 5 moved `src/content/config.ts` to `src/content.config.ts` and requires an explicit `loader` per collection instead of just a `type`. Astro 5 also renamed `entry.slug` to `entry.id` and replaced `entry.render()` with a standalone `render(entry)` import. Three breaking changes discovered by reading the actual error messages and fixing one at a time, rather than assuming the docs I'd memorised were still current.
 
 ---
 
-## What I Learned About Directing AI, Not Just Prompting It
+## The Coordination Failure — and Why It Matters
 
-The most instructive moment wasn't a code bug — it was a coordination failure between what I asked for and what got built.
+The most instructive moment wasn't a code bug. It was a coordination failure between what I asked for and what got built.
 
-I'd flagged the diagram alignment issue and asked for "the diagrams fixed." Claude Code's first response was to **replace the ASCII diagrams with plain numbered text** — technically solving the alignment problem by removing the thing that could misalign. Functionally correct, but not what I wanted: I liked the diagrams as a design choice, the bug was the alignment, not the format.
+I'd flagged the diagram alignment issue and asked for "the diagrams fixed." Claude Code's first response was to **replace the ASCII diagrams with plain numbered text** — technically solving the alignment problem by removing the thing that could misalign. Functionally correct. Not what I wanted.
 
-I caught this immediately and said so. The fix wasn't a small edit — by that point, several other legitimate changes (anonymizing internal team names, adding real cron-job scheduling details) had landed in the *same* commits as the diagram removal. Untangling "keep this, not that" from a tangled commit history needed a real git operation: `git reset --hard` two commits back, then **manually reapplying only the two changes I wanted**, verified with a clean build, then a force-push to sync the rewritten history.
+This is exactly the failure mode of vibe coding: you accept the output because it looks like it works, without checking whether it matches your intent. I caught it immediately because I was paying attention to the diff, not just the result.
+
+The fix wasn't a small edit — by that point, several other legitimate changes (anonymizing internal team names, adding cron-job scheduling details) had landed in the *same* commits as the diagram removal. Untangling "keep this, not that" from a tangled commit history needed a real git operation: `git reset --hard` two commits back, then **manually reapplying only the two changes I wanted**, verified with a clean build, then a force-push to sync the rewritten history.
 
 What made that recoverable instead of messy:
 
 - **I caught the mismatch immediately**, not three commits later — the longer a wrong direction runs, the more it costs to unwind
 - **I was specific about scope**: "roll back to this exact commit, reapply only these two named changes, do not touch the third thing" — not "redo it" (vague) or "undo everything" (overcorrects)
 - **Verification before trusting the result** — every diagram rebuild after that point was checked with an actual character-count script before being written to a file, not eyeballed
-
-The broader takeaway: directing an AI coding assistant is closer to directing a capable but context-free contractor than it is to autocomplete. It will solve the problem you described, not the problem you meant, if those two things differ. The skill isn't writing a clever prompt once — it's catching the gap quickly, being precise about what to keep versus discard, and verifying the fix instead of assuming it worked.
 
 ---
 
@@ -100,4 +118,4 @@ The broader takeaway: directing an AI coding assistant is closer to directing a 
 - **Architectural ownership** — stack choice, content structure, and deployment pipeline were directed decisions, not defaults accepted blindly
 - **Real debugging discipline** — every fix in this post came from inspecting actual output (built HTML, exact character counts, raw error messages), not guessing
 - **Git hygiene under pressure** — a tangled commit history got untangled with a deliberate `reset` + selective reapply, verified before force-pushing
-- **Honest engineering communication** — this post exists because I think showing the AI-collaboration process, including the part where it went sideways and I corrected it, is more credible than pretending every line shipped perfectly on the first try
+- **The difference from vibe coding** — I can explain why every fix worked. That's the bar.
