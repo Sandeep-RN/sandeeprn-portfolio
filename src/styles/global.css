@@ -47,3 +47,24 @@ body {
   vertical-align: text-bottom;
   animation: blink 1s step-end infinite;
 }
+
+/* Shiki "css-variables" theme tokens — overrides hardcoded github-dark colors
+   so code blocks use our site palette instead of a mismatched gray. */
+:root {
+  --astro-code-foreground: #e6edf3;
+  --astro-code-background: #0d1117;
+  --astro-code-token-constant: #00ff88;
+  --astro-code-token-string: #9ecbff;
+  --astro-code-token-comment: #8b949e;
+  --astro-code-token-keyword: #ff7b72;
+  --astro-code-token-parameter: #ffab70;
+  --astro-code-token-function: #b392f0;
+  --astro-code-token-string-expression: #9ecbff;
+  --astro-code-token-punctuation: #e6edf3;
+  --astro-code-token-link: #9ecbff;
+}
+
+pre.astro-code,
+pre.astro-code span {
+  background-color: transparent !important;
+}
