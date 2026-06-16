@@ -16,26 +16,26 @@ Provisioning a production-style Amazon EKS cluster using Terraform — using the
 ## Infrastructure Design
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                    AWS Account                           │
-│                                                         │
-│  ┌─────────────────────────────────────────────────┐   │
-│  │                  VPC (10.0.0.0/16)               │   │
-│  │                                                  │   │
-│  │  ┌──────────────┐    ┌──────────────┐           │   │
-│  │  │ Public Subnet│    │ Public Subnet│           │   │
-│  │  │  ap-south-1a │    │  ap-south-1b │           │   │
-│  │  └──────┬───────┘    └──────┬───────┘           │   │
-│  │         │ NAT GW            │ NAT GW             │   │
-│  │  ┌──────▼───────┐    ┌──────▼───────┐           │   │
-│  │  │Private Subnet│    │Private Subnet│           │   │
-│  │  │  EKS Nodes   │    │  EKS Nodes   │           │   │
-│  │  └──────────────┘    └──────────────┘           │   │
-│  └─────────────────────────────────────────────────┘   │
-│                                                         │
-│  EKS Control Plane (managed)                            │
-│  Node Group: t3.medium × 2 (min 1, max 4)              │
-└─────────────────────────────────────────────────────────┘
+┌───────────────────────────────────────────────────────┐
+│                      AWS Account                      │
+│                                                       │
+│  ┌─────────────────────────────────────────────────┐  │
+│  │                VPC (10.0.0.0/16)                │  │
+│  │                                                 │  │
+│  │  ┌──────────────┐    ┌──────────────┐           │  │
+│  │  │Public Subnet │    │Public Subnet │           │  │
+│  │  │ ap-south-1a  │    │ ap-south-1b  │           │  │
+│  │  └──────┬───────┘    └──────┬───────┘           │  │
+│  │         │ NAT GW            │ NAT GW            │  │
+│  │  ┌──────▼───────┐    ┌──────▼───────┐           │  │
+│  │  │Private Subnet│    │Private Subnet│           │  │
+│  │  │  EKS Nodes   │    │  EKS Nodes   │           │  │
+│  │  └──────────────┘    └──────────────┘           │  │
+│  └─────────────────────────────────────────────────┘  │
+│                                                       │
+│  EKS Control Plane (managed)                          │
+│  Node Group: t3.medium × 2 (min 1, max 4)             │
+└───────────────────────────────────────────────────────┘
 
   Remote State:
   S3 bucket: sandeeprn-tf-state
