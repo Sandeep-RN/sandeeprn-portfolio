@@ -1,0 +1,239 @@
+---
+import Layout from '../layouts/Layout.astro';
+
+const earned = [
+  {
+    name: 'Microsoft Certified: DevOps Engineer Expert',
+    code: 'AZ-400',
+    issuer: 'Microsoft',
+    date: '2024',
+    credentialId: '4790DEDAC422B797',
+    color: '#0078d4',
+    icon: '⚡',
+    verify: 'https://learn.microsoft.com/en-us/users/',
+  },
+  {
+    name: 'Microsoft Certified: Azure Administrator Associate',
+    code: 'AZ-104',
+    issuer: 'Microsoft',
+    date: '2023',
+    credentialId: '8DA648914E6F9A0E',
+    color: '#0078d4',
+    icon: '☁️',
+    verify: 'https://learn.microsoft.com/en-us/users/',
+  },
+  {
+    name: 'Oracle Cloud Infrastructure 2025 Foundations Associate',
+    code: 'OCI-FA',
+    issuer: 'Oracle',
+    date: '2025',
+    credentialId: '102961170OCI25FNDCFA',
+    color: '#f80000',
+    icon: '🔶',
+    verify: 'https://catalog-education.oracle.com/pls/certview/sharebadge',
+  },
+];
+
+const inProgress = [
+  {
+    name: 'Certified Kubernetes Administrator',
+    code: 'CKA',
+    issuer: 'CNCF / Linux Foundation',
+    target: 'Aug 2026',
+    progress: 15,
+    color: '#326ce5',
+    icon: '⎈',
+    why: 'Core credential for Platform Engineering — validates Kubernetes cluster ops, scheduling, networking, and troubleshooting at admin level.',
+  },
+  {
+    name: 'HashiCorp Terraform Associate',
+    code: 'TF-003',
+    issuer: 'HashiCorp',
+    target: 'Oct 2026',
+    progress: 28,
+    color: '#7b42bc',
+    icon: '🏗',
+    why: 'Validates IaC fundamentals — modules, state management, remote backends, and workspace patterns I already use in projects.',
+  },
+];
+
+const timeline = [
+  {
+    year: '2022 – 23',
+    label: 'SRE Foundations',
+    skills: ['Kubernetes (on-call)', 'Zabbix monitoring', 'Linux fleet ops', 'Incident management', 'PagerDuty'],
+    color: '#8b949e',
+  },
+  {
+    year: '2023 – 24',
+    label: 'Multi-Cloud & IaC',
+    skills: ['Azure (AZ-104 ✓)', 'OCI Compute & DR', 'Terraform', 'Ansible', 'Azure DevOps Pipelines'],
+    color: '#00cc6a',
+  },
+  {
+    year: '2024 – 25',
+    label: 'Automation & Depth',
+    skills: ['AZ-400 DevOps Expert ✓', 'Python API automation', 'Zabbix 4 → 7 migration', 'Grafana dashboards', 'OCI SDK'],
+    color: '#00ff88',
+  },
+  {
+    year: '2025 – 26',
+    label: 'Platform Engineering',
+    skills: ['OCI 2025 Foundations ✓', 'EKS + Terraform modules', 'Docker → ECR pipelines', 'CKA (in progress)', 'TF Associate (in progress)'],
+    color: '#00ff88',
+    current: true,
+  },
+];
+---
+
+<Layout title="Certifications — Sandeep R N" description="Microsoft Azure, Oracle OCI certifications earned. CKA and Terraform Associate in progress.">
+  <div class="max-w-5xl mx-auto px-6 py-16">
+
+    <!-- Header -->
+    <p class="font-mono text-[#00ff88] text-sm mb-2 tracking-widest uppercase">$ cat ./certifications</p>
+    <h1 class="text-4xl font-bold mb-3">Certifications</h1>
+    <p class="text-[#8b949e] mb-16 max-w-xl">
+      Three earned, two in progress. The pattern: certify what I'm already doing in production, then go deeper.
+    </p>
+
+    <!-- Earned -->
+    <section class="mb-20">
+      <h2 class="font-mono text-[#00ff88] text-xs uppercase tracking-widest mb-8">✓ Earned</h2>
+      <div class="space-y-4">
+        {earned.map((cert, i) => (
+          <div class="border border-[#30363d] rounded-lg p-6 bg-[#161b22] flex flex-col md:flex-row md:items-center gap-4">
+            <!-- Index line -->
+            <div class="font-mono text-[#30363d] text-sm w-6 shrink-0 hidden md:block">{String(i + 1).padStart(2, '0')}</div>
+
+            <!-- Badge circle -->
+            <div
+              class="w-12 h-12 rounded-full flex items-center justify-center text-xl shrink-0 border-2"
+              style={`border-color: ${cert.color}33; background-color: ${cert.color}11;`}
+            >
+              {cert.icon}
+            </div>
+
+            <!-- Info -->
+            <div class="flex-1">
+              <div class="flex flex-wrap items-center gap-2 mb-1">
+                <span
+                  class="font-mono text-xs px-2 py-0.5 rounded border"
+                  style={`color: ${cert.color}; border-color: ${cert.color}55; background-color: ${cert.color}11;`}
+                >
+                  {cert.code}
+                </span>
+                <span class="text-[#8b949e] text-xs font-mono">{cert.issuer} · {cert.date}</span>
+              </div>
+              <h3 class="text-[#e6edf3] font-semibold">{cert.name}</h3>
+              <p class="text-[#8b949e] text-xs font-mono mt-1">ID: {cert.credentialId}</p>
+            </div>
+
+            <!-- Status badge -->
+            <div class="shrink-0">
+              <span class="px-3 py-1 text-xs font-mono bg-[#00ff8815] text-[#00ff88] border border-[#00ff8840] rounded">
+                ✓ Certified
+              </span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+
+    <!-- In Progress -->
+    <section class="mb-20">
+      <h2 class="font-mono text-[#00ff88] text-xs uppercase tracking-widest mb-8">▶ In Progress</h2>
+      <div class="grid md:grid-cols-2 gap-6">
+        {inProgress.map((cert) => (
+          <div class="border border-[#30363d] rounded-lg p-6 bg-[#161b22]">
+            <div class="flex items-start gap-3 mb-4">
+              <div
+                class="w-10 h-10 rounded-full flex items-center justify-center text-lg shrink-0 border-2"
+                style={`border-color: ${cert.color}44; background-color: ${cert.color}11;`}
+              >
+                {cert.icon}
+              </div>
+              <div>
+                <span
+                  class="font-mono text-xs px-2 py-0.5 rounded border"
+                  style={`color: ${cert.color}; border-color: ${cert.color}55; background-color: ${cert.color}11;`}
+                >
+                  {cert.code}
+                </span>
+                <h3 class="text-[#e6edf3] font-semibold mt-1">{cert.name}</h3>
+                <p class="text-[#8b949e] text-xs font-mono mt-0.5">{cert.issuer}</p>
+              </div>
+            </div>
+
+            <!-- Progress bar -->
+            <div class="mb-3">
+              <div class="flex justify-between items-center mb-1.5">
+                <span class="font-mono text-xs text-[#8b949e]">Progress</span>
+                <span class="font-mono text-xs text-[#e6edf3]">{cert.progress}%</span>
+              </div>
+              <div class="h-1.5 bg-[#0d1117] rounded-full overflow-hidden border border-[#30363d]">
+                <div
+                  class="h-full rounded-full transition-all"
+                  style={`width: ${cert.progress}%; background-color: ${cert.color};`}
+                >
+                </div>
+              </div>
+              <p class="font-mono text-xs text-[#8b949e] mt-1.5">Target: {cert.target}</p>
+            </div>
+
+            <p class="text-[#8b949e] text-sm leading-relaxed border-t border-[#30363d] pt-3 mt-3">
+              {cert.why}
+            </p>
+          </div>
+        ))}
+      </div>
+    </section>
+
+    <!-- Skills Growth Arc -->
+    <section>
+      <p class="font-mono text-[#00ff88] text-sm mb-2 tracking-widest uppercase">$ git log --oneline ./career</p>
+      <h2 class="text-3xl font-bold mb-3">Skills Arc</h2>
+      <p class="text-[#8b949e] mb-12">Four years of deliberate progression — each year built on the last.</p>
+
+      <div class="relative">
+        <!-- Vertical line -->
+        <div class="absolute left-6 top-0 bottom-0 w-px bg-[#30363d] hidden md:block"></div>
+
+        <div class="space-y-10">
+          {timeline.map((entry) => (
+            <div class="flex gap-6 md:gap-10">
+              <!-- Node -->
+              <div class="relative shrink-0 hidden md:flex flex-col items-center">
+                <div
+                  class={`w-3 h-3 rounded-full mt-1.5 border-2 z-10 ${entry.current ? 'animate-pulse' : ''}`}
+                  style={`border-color: ${entry.color}; background-color: ${entry.current ? entry.color : '#0d1117'};`}
+                >
+                </div>
+              </div>
+
+              <!-- Content -->
+              <div class="flex-1 border border-[#30363d] rounded-lg p-5 bg-[#161b22]">
+                <div class="flex flex-wrap items-center gap-3 mb-3">
+                  <span class="font-mono text-xs text-[#8b949e]">{entry.year}</span>
+                  <h3 class="font-semibold" style={`color: ${entry.color};`}>{entry.label}</h3>
+                  {entry.current && (
+                    <span class="px-2 py-0.5 text-xs font-mono bg-[#00ff8820] text-[#00ff88] border border-[#00ff8840] rounded">
+                      now
+                    </span>
+                  )}
+                </div>
+                <div class="flex flex-wrap gap-2">
+                  {entry.skills.map((skill) => (
+                    <span class="px-3 py-1 text-sm font-mono bg-[#0d1117] border border-[#30363d] rounded text-[#e6edf3]">
+                      {skill}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+
+  </div>
+</Layout>
