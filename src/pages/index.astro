@@ -54,10 +54,10 @@ const latestPosts = posts
         { value: '3+', label: 'Years in SRE' },
         { value: '$4,536/yr', label: 'Cloud waste stopped' },
         { value: '15+ hrs/wk', label: 'Recurring toil automated' },
-        { value: '3 Earned', label: 'Certifications', sub: 'CKA · TF Assoc in progress' },
+        { value: 'AZ-104 · AZ-400 · OCI', label: 'Certified', sub: 'CKA · TF Assoc in progress', small: true },
       ].map((stat) => (
         <div class="border border-[#30363d] rounded-lg p-4 bg-[#161b22]">
-          <div class="font-mono text-[#00ff88] font-bold text-xl mb-1">{stat.value}</div>
+          <div class={`font-mono text-[#00ff88] font-bold mb-1 ${'small' in stat ? 'text-sm' : 'text-xl'}`}>{stat.value}</div>
           <div class="text-[#8b949e] text-xs uppercase tracking-wide">{stat.label}</div>
           {'sub' in stat && <div class="font-mono text-[#8b949e] text-xs mt-1.5">{stat.sub}</div>}
         </div>
@@ -115,7 +115,7 @@ const latestPosts = posts
           <div class="text-[#e6edf3] text-sm mt-1">OCI 2025 Foundations</div>
         </div>
         <div class="border border-[#30363d] rounded-lg p-4 bg-[#161b22]">
-          <div class="text-[#00ff88] font-mono text-xs uppercase tracking-widest mb-2">Studying</div>
+          <div class="text-[#00ff88] font-mono text-xs uppercase tracking-widest mb-2">In Progress</div>
           <div class="text-[#e6edf3] text-sm">CKA — 15% <span class="text-[#8b949e]">→ Aug 2026</span></div>
           <div class="text-[#e6edf3] text-sm mt-1">Terraform Associate — 28% <span class="text-[#8b949e]">→ Oct 2026</span></div>
         </div>
