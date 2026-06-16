@@ -44,15 +44,26 @@ Before committing any content file (blog or project):
 
 ### 4. ASCII diagram alignment
 
-If a blog or project post contains ASCII box-drawing diagrams, verify every line inside the code block has the same character length using PowerShell:
+Diagrams MUST use plain ASCII characters only — no Unicode box-drawing chars (┌─┐│└┘▼ etc.). Unicode chars in the U+2500+ range render at inconsistent pixel widths because Google Fonts subsets them out, causing browser font fallback mid-line that breaks alignment even when character counts are equal.
 
+Use: `+` for corners and junctions, `-` for horizontal lines, `|` for vertical lines, `v` for down-arrows.
+
+If a diagram exists with Unicode chars, replace them using this PowerShell snippet:
+```powershell
+$map = @{
+  [char]0x250C='+';[char]0x2510='+';[char]0x2514='+';[char]0x2518='+'
+  [char]0x251C='+';[char]0x2524='+';[char]0x252C='+';[char]0x2534='+'
+  [char]0x2500='-';[char]0x2502='|';[char]0x25BC='v'
+}
+$c = [System.IO.File]::ReadAllText($file)
+foreach ($kv in $map.GetEnumerator()) { $c = $c.Replace([string]$kv.Key,[string]$kv.Value) }
+[System.IO.File]::WriteAllText($file, $c)
+```
+
+After any diagram change, verify all box-border lines have equal length:
 ```powershell
 $lines = [System.IO.File]::ReadAllLines("path\to\file.mdx")
 foreach ($l in $lines) {
-  if ($l.Contains([char]0x250C) -or $l.Contains([char]0x2502) -or $l.Contains([char]0x2514)) {
-    Write-Host "$($l.Length): $l"
-  }
+  if ($l -match '[\+\-\|]' -and $l.Length -gt 10) { Write-Host "$($l.Length): $l" }
 }
 ```
-
-All box-border lines must print the same length number. If they differ, rebuild the diagram with calculated padding — do not hand-align.
