@@ -45,7 +45,7 @@ Astro's default Shiki theme (`github-dark`) injects an **inline style** directly
 
 The architecture diagrams in my project write-ups (box-drawing characters like `┌─┐│└┘`) looked like a staircase instead of clean rectangles. I'd actually asked for these diagrams to be *removed* at one point, frustrated with the visual bug — then asked to roll that back, because I liked the diagrams and just wanted the bug fixed, not the feature deleted.
 
-The actual cause, found by counting exact Unicode character lengths per line:
+There turned out to be two separate causes. The first was found by counting exact Unicode character lengths per line:
 
 ```
 47: ┌─────────────────────────────────────────────┐
@@ -53,7 +53,19 @@ The actual cause, found by counting exact Unicode character lengths per line:
 47: │                                             │
 ```
 
-Lines that should have been identical width were off by 1–2 characters — hand-typed ASCII art with inconsistent padding. The fix was to stop hand-aligning and instead **build each diagram programmatically**: compute exact padding with a script, verify every line length matches before writing it to the file.
+Lines that should have been identical width were off by 1–2 characters — hand-typed ASCII art with inconsistent padding. The fix: stop hand-aligning and instead **build each diagram programmatically**: compute exact padding with a script, verify every line length matches before writing it to the file.
+
+The second cause was subtler and survived even after all character counts were correct. Box-drawing characters (U+2500–U+257F: `┌─┐│└┘▼`) are a separate Unicode block that fonts can omit from their subset. Google Fonts serves JetBrains Mono with a reduced character set to keep file sizes down — and that subset doesn't include box-drawing characters. So when the browser rendered the diagrams, it silently fell back to a different system font for those specific characters. That fallback font has slightly different character widths, which breaks alignment even when every line has an identical character count.
+
+The fix: explicitly load **Fira Code** from Google Fonts (it ships the full box-drawing range), and add a targeted CSS rule so `pre.astro-code` uses Fira Code first:
+
+```css
+pre.astro-code {
+  font-family: 'Fira Code', 'JetBrains Mono', 'Cascadia Code', ui-monospace, monospace;
+}
+```
+
+**Lesson:** character count is a necessary condition for ASCII diagram alignment, not a sufficient one. The rendered font has to include those characters — otherwise the browser quietly substitutes a different font mid-line and the alignment breaks in a way that's invisible in your editor but visible in the browser.
 
 ### 3. The Cloudflare `www` subdomain 522 error
 
