@@ -54,11 +54,12 @@ const latestPosts = posts
         { value: '3+', label: 'Years in SRE' },
         { value: '$4,536/yr', label: 'Cloud waste stopped' },
         { value: '15+ hrs/wk', label: 'Recurring toil automated' },
-        { value: 'AZ-400 · AZ-104 · OCI', label: 'Certified' },
+        { value: '3 Earned', label: 'Certifications', sub: 'CKA · TF Assoc in progress' },
       ].map((stat) => (
         <div class="border border-[#30363d] rounded-lg p-4 bg-[#161b22]">
           <div class="font-mono text-[#00ff88] font-bold text-xl mb-1">{stat.value}</div>
           <div class="text-[#8b949e] text-xs uppercase tracking-wide">{stat.label}</div>
+          {'sub' in stat && <div class="font-mono text-[#8b949e] text-xs mt-1.5">{stat.sub}</div>}
         </div>
       ))}
     </div>
