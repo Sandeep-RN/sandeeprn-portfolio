@@ -1,5 +1,11 @@
 ---
 import Layout from '../layouts/Layout.astro';
+import { getCollection } from 'astro:content';
+
+const posts = await getCollection('blog');
+const latestPosts = posts
+  .sort((a, b) => new Date(b.data.date).getTime() - new Date(a.data.date).getTime())
+  .slice(0, 3);
 ---
 
 <Layout>
@@ -46,9 +52,9 @@ import Layout from '../layouts/Layout.astro';
     <div class="mt-20 grid grid-cols-2 md:grid-cols-4 gap-6">
       {[
         { value: '3+', label: 'Years in SRE' },
-        { value: '$378/mo', label: 'Cloud waste identified' },
-        { value: '~10 hrs/wk', label: 'Toil eliminated' },
-        { value: 'CKA · TF Assoc', label: 'In Progress' },
+        { value: '$4,536/yr', label: 'Cloud waste stopped' },
+        { value: '15+ hrs/wk', label: 'Recurring toil automated' },
+        { value: 'AZ-400 · AZ-104 · OCI', label: 'Certified' },
       ].map((stat) => (
         <div class="border border-[#30363d] rounded-lg p-4 bg-[#161b22]">
           <div class="font-mono text-[#00ff88] font-bold text-xl mb-1">{stat.value}</div>
@@ -83,9 +89,11 @@ import Layout from '../layouts/Layout.astro';
         </p>
         <p>
           In the last year: led a <span class="text-[#e6edf3]">Zabbix 4 → 7 migration</span> with zero monitoring
-          gaps for 15k+ URL checks, automated monthly utilisation reports across 4 customer categories
-          (saving ~<span class="text-[#e6edf3]">10 hrs/week</span>), and built OCI cleanup automation that
-          identified <span class="text-[#e6edf3]">$378/month in cloud waste</span> across 20+ customer compartments.
+          gaps for 15k+ URL checks; automated daily alert digests, weekly and monthly utilisation
+          reports across 4 customer categories — eliminating <span class="text-[#e6edf3]">15+ hours/week</span> of
+          manual data collection that used to take multiple people multiple days; and built OCI cleanup
+          automation that identified <span class="text-[#e6edf3]">$4,536/year in cloud waste</span> across
+          20+ customer compartments while replacing a tedious manual hunt across 8 regions.
         </p>
         <p>
           Now moving into Platform Engineering — pursuing <span class="text-[#00ff88]">CKA</span> and
@@ -98,6 +106,12 @@ import Layout from '../layouts/Layout.astro';
           <div class="text-[#00ff88] font-mono text-xs uppercase tracking-widest mb-2">Currently</div>
           <div class="text-[#e6edf3] text-sm">Senior Cloud Engineer @ SymphonyAI</div>
           <div class="text-[#8b949e] text-xs mt-1">Apr 2026 – Present</div>
+        </div>
+        <div class="border border-[#30363d] rounded-lg p-4 bg-[#161b22]">
+          <div class="text-[#00ff88] font-mono text-xs uppercase tracking-widest mb-2">Certified</div>
+          <div class="text-[#e6edf3] text-sm">AZ-400 DevOps Expert</div>
+          <div class="text-[#e6edf3] text-sm mt-1">AZ-104 Azure Administrator</div>
+          <div class="text-[#e6edf3] text-sm mt-1">OCI 2025 Foundations</div>
         </div>
         <div class="border border-[#30363d] rounded-lg p-4 bg-[#161b22]">
           <div class="text-[#00ff88] font-mono text-xs uppercase tracking-widest mb-2">Studying</div>
@@ -147,37 +161,36 @@ import Layout from '../layouts/Layout.astro';
     <div class="grid md:grid-cols-2 gap-6">
       {[
         {
+          title: 'OCI Cloud Cost Automation',
+          tags: ['Python', 'OCI', 'Cloud Cost', 'Multi-tenant'],
+          desc: 'Automated weekly detection and cleanup of unattached OCI volumes across 20+ compartments — identified $4,536/year in cloud waste and replaced hours of manual hunting across 8 regions.',
+          slug: 'oci-cost-automation',
+          done: true,
+        },
+        {
+          title: 'Monitoring Stack: Zabbix Migration & Automation',
+          tags: ['Zabbix', 'Python', 'Ansible', 'Prometheus'],
+          desc: 'Led Zabbix 4 → 7 migration with zero monitoring gaps across 1000+ servers. Built Python automation eliminating 15+ hrs/week of manual daily, weekly, and monthly reporting.',
+          slug: 'monitoring-stack',
+          done: true,
+        },
+        {
+          title: 'EKS Cluster via Terraform',
+          tags: ['Terraform', 'EKS', 'AWS', 'IaC'],
+          desc: 'Production-style EKS cluster provisioned using Terraform VPC and EKS modules with remote state in S3 + DynamoDB locking.',
+          slug: 'eks-terraform',
+          done: false,
+        },
+        {
           title: 'Docker Multi-Service App → ECR',
           tags: ['Docker', 'AWS ECR', 'Containerization'],
           desc: 'Multi-service application containerized with Docker and pushed to Amazon ECR with proper image tagging and lifecycle policies.',
           slug: 'docker-ecr',
           done: true,
         },
-        {
-          title: 'Monitoring Stack: Prometheus + Grafana + Zabbix',
-          tags: ['Prometheus', 'Grafana', 'Zabbix', 'Observability'],
-          desc: 'Production-grade monitoring stack with alerting rules, custom dashboards, and Zabbix integration for infrastructure visibility.',
-          slug: 'monitoring-stack',
-          done: true,
-        },
-        {
-          title: 'Career Tracker App',
-          tags: ['FastAPI', 'React', 'OCI', 'Full-Stack'],
-          desc: 'Full-stack career tracking application. FastAPI backend on Oracle Cloud Free Tier, React frontend at sandeeprn.in/tracker.',
-          slug: 'career-tracker',
-          done: false,
-        },
-        {
-          title: 'OCI Cloud Cost Automation',
-          tags: ['Python', 'OCI', 'Cloud Cost', 'Multi-tenant'],
-          desc: 'Automated detection and cleanup of unattached OCI volumes across 20+ customer compartments — identified $378/month ($4,536/year) in cloud waste.',
-          slug: 'oci-cost-automation',
-          done: true,
-        },
       ].map((project) => (
         <a
           href={`/projects/${project.slug}`}
-
           class="group border border-[#30363d] rounded-lg p-6 bg-[#161b22] hover:border-[#00ff88] transition-colors block"
         >
           <div class="flex items-start justify-between mb-3">
@@ -200,6 +213,41 @@ import Layout from '../layouts/Layout.astro';
           </div>
         </a>
       ))}
+    </div>
+    <div class="mt-8 text-center">
+      <a href="/projects" class="font-mono text-sm text-[#8b949e] hover:text-[#00ff88] transition-colors">
+        ./view-all-projects →
+      </a>
+    </div>
+  </section>
+
+  <!-- Latest Posts -->
+  <section class="max-w-5xl mx-auto px-6 py-16 border-t border-[#30363d]">
+    <p class="font-mono text-[#00ff88] text-sm mb-2 tracking-widest uppercase">$ tail ./blog</p>
+    <h2 class="text-3xl font-bold mb-3">Latest Posts</h2>
+    <p class="text-[#8b949e] mb-10">Technical write-ups from real production work — not tutorials, not theory.</p>
+    <div class="space-y-4">
+      {latestPosts.map((post) => (
+        <a
+          href={`/blog/${post.id}`}
+          class="group flex flex-col md:flex-row md:items-center gap-3 border border-[#30363d] rounded-lg p-5 bg-[#161b22] hover:border-[#00ff88] transition-colors"
+        >
+          <div class="flex-1">
+            <h3 class="font-semibold text-[#e6edf3] group-hover:text-[#00ff88] transition-colors mb-1">
+              {post.data.title}
+            </h3>
+            <p class="text-[#8b949e] text-sm leading-relaxed">{post.data.description}</p>
+          </div>
+          <div class="shrink-0 font-mono text-xs text-[#8b949e]">
+            {new Date(post.data.date).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })}
+          </div>
+        </a>
+      ))}
+    </div>
+    <div class="mt-8 text-center">
+      <a href="/blog" class="font-mono text-sm text-[#8b949e] hover:text-[#00ff88] transition-colors">
+        ./read-all-posts →
+      </a>
     </div>
   </section>
 
