@@ -1,5 +1,16 @@
 # Claude Code Instructions — sandeeprn-portfolio
 
+## Deployment Rule
+
+After **every** set of file changes — no exceptions — run:
+
+1. `npm run build` (verify zero errors before proceeding)
+2. `git add <changed files>`
+3. `git commit -m "..."` 
+4. `git push origin master`
+
+Cloudflare Pages auto-deploys on push. Do not stop at file edits and consider the task done.
+
 ## Blog Post Pre-publish Checklist
 
 Run these checks every time a new blog post (`src/content/blog/*.mdx`) is added or tags are changed.
