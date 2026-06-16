@@ -46,8 +46,8 @@ import Layout from '../layouts/Layout.astro';
     <div class="mt-20 grid grid-cols-2 md:grid-cols-4 gap-6">
       {[
         { value: '3+', label: 'Years in SRE' },
-        { value: '1000+', label: 'Servers managed' },
-        { value: 'AWS · Azure · OCI', label: 'Multi-cloud' },
+        { value: '$378/mo', label: 'Cloud waste identified' },
+        { value: '~10 hrs/wk', label: 'Toil eliminated' },
         { value: 'CKA · TF Assoc', label: 'In Progress' },
       ].map((stat) => (
         <div class="border border-[#30363d] rounded-lg p-4 bg-[#161b22]">
@@ -65,20 +65,22 @@ import Layout from '../layouts/Layout.astro';
     <div class="grid md:grid-cols-3 gap-10">
       <div class="md:col-span-2 space-y-4 text-[#8b949e] leading-relaxed">
         <p>
-          I'm a Cloud &amp; SRE Engineer at SymphonyAI, Bengaluru — managing production reliability across a
-          <span class="text-[#e6edf3]">1000+ server estate on Azure and OCI</span>. My day-to-day spans
-          large-scale observability (15k+ URL checks), Kubernetes platform adoption, blameless RCAs,
-          and eliminating operational toil through Python and API automation.
+          I build the automation and tooling that keeps production reliable at scale.
+          At SymphonyAI, that means owning observability across a
+          <span class="text-[#e6edf3]">1000+ server estate on Azure and OCI</span> —
+          but more importantly, it means writing the Python and Ansible that eliminates the toil
+          so the team doesn't have to do it manually.
         </p>
         <p>
-          I've executed a zero-gap <span class="text-[#e6edf3]">Zabbix 4 → 7 migration</span> at scale,
-          built idempotent Ansible playbooks that cut server onboarding from 30 min to under 2 min, and
-          implemented OCI DR Protection Groups that measurably improved RTO/RPO for Tier-1 customers.
+          In the last year: led a <span class="text-[#e6edf3]">Zabbix 4 → 7 migration</span> with zero monitoring
+          gaps for 15k+ URL checks, automated monthly utilisation reports across 4 customer categories
+          (saving ~<span class="text-[#e6edf3]">10 hrs/week</span>), and built OCI cleanup automation that
+          identified <span class="text-[#e6edf3]">$378/month in cloud waste</span> across 20+ customer compartments.
         </p>
         <p>
-          Now deepening my platform engineering skills — currently pursuing <span class="text-[#00ff88]">CKA</span> and
-          <span class="text-[#00ff88]">Terraform Associate</span>, and building real IaC and containerisation
-          projects to close the gap from SRE to Platform Engineering.
+          Now moving into Platform Engineering — pursuing <span class="text-[#00ff88]">CKA</span> and
+          <span class="text-[#00ff88]">Terraform Associate</span>, and building IaC and containerisation
+          projects that reflect the work, not just the certs.
         </p>
       </div>
       <div class="space-y-3">
