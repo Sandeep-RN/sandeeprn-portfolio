@@ -1,0 +1,91 @@
+---
+title: "Building This Site: A Case Study in Directing AI-Assisted Development"
+description: "How I built sandeeprn.in from scratch with Astro and Cloudflare Pages — the real bugs I hit, and what I learned about directing an AI coding assistant instead of just prompting it."
+tags: ["Astro", "Cloudflare", "AI-Assisted Development", "Debugging", "Meta"]
+date: "2026-06-17"
+---
+
+This site is itself a project worth writing up. Not because the tech stack is exotic — it's Astro, Tailwind, and Cloudflare Pages, all fairly standard — but because of *how* I built it: directing Claude Code through every decision, catching its mistakes, and learning where AI assistance accelerates work versus where it needs a firm hand.
+
+If you're evaluating whether I can ship things independently, this is the honest version of that story — including the part where I had to roll back a commit because the AI's interpretation didn't match what was in my head.
+
+---
+
+## The Brief I Gave Myself
+
+Domain bought, Cloudflare DNS pointed, goal: a portfolio that signals "Platform Engineer in progress" to a hiring manager within 60 seconds. Before writing code, I had Claude Code interview me — vision, target audience, projects to feature, tech stack tradeoffs. That interview phase mattered: it forced me to articulate that I wanted "growing fast" and "thinks like a platform engineer" as the two takeaways, which shaped every later decision (the certs timeline, the dark terminal aesthetic, leading project write-ups with real production numbers instead of generic descriptions).
+
+**Stack decision:** Astro + Tailwind + MDX. Static-first, ships zero JS by default, content collections for projects/blog as structured Markdown. Reasoning given to me: fast Cloudflare Pages builds, good Lighthouse scores, MDX lets project write-ups embed real code snippets without a separate CMS.
+
+## Building in Buckets
+
+Rather than one giant build-and-pray, the work was split into agile buckets — scaffold, hero/about/skills, project pages, certifications, blog, SEO — each one built, deployed to a Cloudflare Pages preview, and reviewed before moving to the next. This caught problems early: I flagged the salary-disclosure line in the contact section before it ever went live, and caught customer-name leakage in project write-ups during review rather than after the fact.
+
+This is the same instinct as deploying behind a feature flag instead of pushing straight to prod — small verified increments beat one large unverified one.
+
+---
+
+## Real Bugs, Real Fixes
+
+### 1. The Shiki syntax highlighter silently overriding my theme
+
+Every code block on the project pages looked subtly wrong — backgrounds that didn't match my `#0d1117` dark theme. I asked Claude Code to diagnose it, not just "fix the colors."
+
+The fix wasn't guessed — it was verified by inspecting the actual built HTML output:
+
+```html
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8;overflow-x:auto">
+```
+
+Astro's default Shiki theme (`github-dark`) injects an **inline style** directly on every `<pre>` tag. Inline styles always beat CSS classes, so my Tailwind `prose-pre:bg-[#0d1117]` override was being silently ignored — not a CSS bug, a specificity bug. The real fix: set `markdown.shikiConfig.theme` to `css-variables` in `astro.config.mjs`, so syntax highlighting respects my color tokens instead of hardcoding GitHub's palette.
+
+**Lesson on directing AI:** asking "why is this happening" instead of "make this look right" got me a root-cause fix in one pass instead of CSS patch-on-patch.
+
+### 2. ASCII diagram alignment — the "ladder" bug
+
+The architecture diagrams in my project write-ups (box-drawing characters like `┌─┐│└┘`) looked like a staircase instead of clean rectangles. I'd actually asked for these diagrams to be *removed* at one point, frustrated with the visual bug — then asked to roll that back, because I liked the diagrams and just wanted the bug fixed, not the feature deleted.
+
+The actual cause, found by counting exact Unicode character lengths per line:
+
+```
+47: ┌─────────────────────────────────────────────┐
+48: │              Local Development               │   ← 1 char too wide
+47: │                                             │
+```
+
+Lines that should have been identical width were off by 1–2 characters — hand-typed ASCII art with inconsistent padding. The fix was to stop hand-aligning and instead **build each diagram programmatically**: compute exact padding with a script, verify every line length matches before writing it to the file.
+
+### 3. The Cloudflare `www` subdomain 522 error
+
+After redirecting `www.sandeeprn.in` → `sandeeprn.in`, the www version returned a 522 (connection timeout) instead of redirecting. The DNS record existed and was proxied — but Cloudflare Pages didn't recognize `www.sandeeprn.in` as belonging to my project. DNS routing and Pages' own custom-domain registration are two separate steps; I'd only done the first. Adding `www.sandeeprn.in` explicitly under **Pages → Custom Domains** fixed it immediately.
+
+### 4. Astro 5's breaking change to content collections
+
+Midway through, `npm run build` failed with `LegacyContentConfigError` — Astro 5 moved `src/content/config.ts` to `src/content.config.ts` and requires an explicit `loader` per collection instead of just a `type`. Astro 5 also renamed `entry.slug` to `entry.id` and replaced `entry.render()` with a standalone `render(entry)` import. Three breaking changes discovered by reading the actual error messages and fixing one at a time, rather than assuming the docs I'd memorized were still current.
+
+---
+
+## What I Learned About Directing AI, Not Just Prompting It
+
+The most instructive moment wasn't a code bug — it was a coordination failure between what I asked for and what got built.
+
+I'd flagged the diagram alignment issue and asked for "the diagrams fixed." Claude Code's first response was to **replace the ASCII diagrams with plain numbered text** — technically solving the alignment problem by removing the thing that could misalign. Functionally correct, but not what I wanted: I liked the diagrams as a design choice, the bug was the alignment, not the format.
+
+I caught this immediately and said so. The fix wasn't a small edit — by that point, several other legitimate changes (anonymizing internal team names, adding real cron-job scheduling details) had landed in the *same* commits as the diagram removal. Untangling "keep this, not that" from a tangled commit history needed a real git operation: `git reset --hard` two commits back, then **manually reapplying only the two changes I wanted**, verified with a clean build, then a force-push to sync the rewritten history.
+
+What made that recoverable instead of messy:
+
+- **I caught the mismatch immediately**, not three commits later — the longer a wrong direction runs, the more it costs to unwind
+- **I was specific about scope**: "roll back to this exact commit, reapply only these two named changes, do not touch the third thing" — not "redo it" (vague) or "undo everything" (overcorrects)
+- **Verification before trusting the result** — every diagram rebuild after that point was checked with an actual character-count script before being written to a file, not eyeballed
+
+The broader takeaway: directing an AI coding assistant is closer to directing a capable but context-free contractor than it is to autocomplete. It will solve the problem you described, not the problem you meant, if those two things differ. The skill isn't writing a clever prompt once — it's catching the gap quickly, being precise about what to keep versus discard, and verifying the fix instead of assuming it worked.
+
+---
+
+## What This Demonstrates
+
+- **Architectural ownership** — stack choice, content structure, and deployment pipeline were directed decisions, not defaults accepted blindly
+- **Real debugging discipline** — every fix in this post came from inspecting actual output (built HTML, exact character counts, raw error messages), not guessing
+- **Git hygiene under pressure** — a tangled commit history got untangled with a deliberate `reset` + selective reapply, verified before force-pushing
+- **Honest engineering communication** — this post exists because I think showing the AI-collaboration process, including the part where it went sideways and I corrected it, is more credible than pretending every line shipped perfectly on the first try
