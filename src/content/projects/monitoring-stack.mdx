@@ -107,6 +107,69 @@ Idempotent Ansible playbook deploying Zabbix 7 agent across the Linux fleet. Red
         creates: /usr/sbin/zabbix_agentd
 ```
 
+#### 5. Custom service health checks with trigger configuration
+
+For services where standard TCP/HTTP port checks weren't sufficient, I wrote custom UserParameter scripts deployed via the Zabbix agent. The scripts check actual service state — process presence, daemon responsiveness, application-level conditions — and return structured output that feeds into Zabbix items and trigger expressions.
+
+```bash
+# /etc/zabbix/zabbix_agentd.d/custom_checks.conf
+UserParameter=custom.service.status[*],/usr/local/bin/check_service_status.sh "$1"
+```
+
+```bash
+#!/bin/bash
+# check_service_status.sh — returns 1 if healthy, 0 if degraded
+SERVICE=$1
+if systemctl is-active --quiet "$SERVICE" && \
+   /usr/local/bin/verify_service_health.sh "$SERVICE"; then
+    echo 1
+else
+    echo 0
+fi
+```
+
+Trigger expression in Zabbix — alerts with configurable severity if status drops:
+
+```
+last(/hostname/custom.service.status[my-service])=0
+```
+
+This approach was used for services where port-open checks were passing even when the service was internally broken — the custom check validated actual behaviour, not just connectivity.
+
+#### 6. Synthetic monitoring for application validation
+
+For critical customer-facing applications, response-code checks alone weren't enough — a 200 OK doesn't confirm the app is *working*. I set up synthetic check scripts running on the Zabbix server that simulate a real user session: authenticate, perform a sequence of predefined operations, validate the response at each step, and report pass/fail back as a Zabbix item.
+
+```python
+#!/usr/bin/env python3
+# synthetic_check.py — end-to-end application health validator
+import requests
+
+def run_synthetic_check(base_url, username, password):
+    session = requests.Session()
+
+    # Step 1: Login
+    login = session.post(f"{base_url}/login",
+                         data={"username": username, "password": password})
+    if login.status_code != 200 or "dashboard" not in login.url:
+        return 0  # login failed
+
+    # Step 2: Perform key operation and validate response
+    result = session.get(f"{base_url}/api/health-check")
+    if result.status_code != 200:
+        return 0
+
+    data = result.json()
+    if data.get("status") != "ok":
+        return 0
+
+    return 1  # all checks passed
+
+print(run_synthetic_check(BASE_URL, USERNAME, PASSWORD))
+```
+
+The Zabbix item polls this script via `system.run` or a UserParameter; the trigger fires if the synthetic check fails two consecutive times, avoiding false positives from transient timeouts. This gave confidence that application *functionality* was intact — not just that a server was responding.
+
 ---
 
 ## Python Automation: 10 hrs/week Eliminated
@@ -163,13 +226,13 @@ Script to identify disabled/unreachable Zabbix agents across all teams — catch
 ```
 +-------------------------------------------------------------------+
 |                  Infrastructure (1000+ servers)                   |
-|           Azure VMs · OCI Compute · Kubernetes Nodes              |
+|           Azure VMs · OCI Compute · Docker hosts                  |
 +----+------------------------+-------------------------------------+
     | Zabbix Agent (port 10050)   | Prometheus exporter
     v                              v
     +-------------------+        +-------------------+
     |    Zabbix 7.2     |        |    Prometheus     |
-    |    1000+ hosts    |        |Kubernetes metrics |
+    |    1000+ hosts    |        |Docker cntr metrics|
     |  15k+ URL checks  |        |   node-exporter   |
     | 4 internal teams  |        +---+---------------+
     +---+---------------+             |
@@ -196,6 +259,8 @@ Script to identify disabled/unreachable Zabbix agents across all teams — catch
 
 - **Migration execution at scale** — 15,000+ URL checks, zero gap. Parallel validation before cutover, not a hard switchover.
 - **Alerting improvement** — `nodata()` condition upgrade means monitoring failures are now visible, not silent.
+- **Custom check authoring** — UserParameter scripts + trigger configuration for services where standard port checks didn't validate actual behaviour.
+- **Synthetic monitoring** — end-to-end application validation scripts that simulate real user sessions: login, operate, assert — not just "is the port open."
 - **API-first automation** — JSON-RPC Zabbix API, pyzabbix, pandas, openpyxl — the full Python data pipeline.
-- **Toil quantification** — ~10 hrs/week eliminated is a number I can defend: 4 reports × ~2.5 hrs manual effort each.
+- **Toil quantification** — 15+ hrs/week eliminated across daily digests, weekly and monthly utilisation reports.
 - **Ansible at fleet scale** — idempotent agent rollout, 30 min → 2 min per server onboarding.
