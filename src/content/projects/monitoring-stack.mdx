@@ -8,9 +8,9 @@ date: "2024-12"
 
 ## Overview
 
-This is production observability work at SymphonyAI — not a home lab. The scope covers **1000+ servers** across Azure and OCI, **four internal cloud-team categories**, and a full Zabbix 4 → 7 migration executed with zero monitoring blind spots during cutover.
+This is production SRE work at SymphonyAI — not a home lab. The core deliverable: **SLI measurement infrastructure** tracking a customer-committed **99.95% uptime SLO** across **15k+ URL, synthetic, and service checks** on a 1000+ server estate across Azure and OCI.
 
-The Python automation suite I built against the Zabbix API eliminated approximately **10 hours/week** of manual reporting work.
+That meant building the full stack: Zabbix 4 → 7 migration with zero monitoring blind spots, precision trigger engineering to eliminate false-positive alert noise, synthetic transaction monitors that catch failures invisible to passive checks, and a Python automation suite that eliminated **15+ hrs/week** of recurring manual work.
 
 ---
 

@@ -51,7 +51,7 @@ const latestPosts = posts
 
     <div class="mt-20 grid grid-cols-2 md:grid-cols-4 gap-6">
       {[
-        { value: '3+', label: 'Years in SRE' },
+        { value: '3.5+', label: 'Years in SRE' },
         { value: '$4,536/yr', label: 'Cloud waste stopped' },
         { value: '15+ hrs/wk', label: 'Recurring toil automated' },
         { value: 'AZ-104 · AZ-400 · OCI', label: 'Certified', sub: 'CKA · TF Assoc in progress', small: true },
@@ -82,19 +82,19 @@ const latestPosts = posts
 
       <div class="md:col-span-2 space-y-4 text-[#8b949e] leading-relaxed md:col-start-2">
         <p>
-          I build the automation and tooling that keeps production reliable at scale.
-          At SymphonyAI, that means owning observability across a
-          <span class="text-[#e6edf3]">1000+ server estate on Azure and OCI</span> —
-          but more importantly, it means writing the Python and Ansible that eliminates the toil
-          so the team doesn't have to do it manually.
+          I build the reliability infrastructure and automation that keeps production measurably stable.
+          At SymphonyAI, that means owning a <span class="text-[#e6edf3]">99.95% uptime SLO</span> across
+          a 1000+ server estate on Azure and OCI — tracking it with SLI measurement across
+          15k+ URL, synthetic, and service checks, and writing the Python and Ansible that eliminates
+          the toil so the team doesn't have to do it manually.
         </p>
         <p>
-          In the last year: led a <span class="text-[#e6edf3]">Zabbix 4 → 7 migration</span> with zero monitoring
-          gaps for 15k+ URL checks; automated daily alert digests, weekly and monthly utilisation
-          reports across 4 customer categories — eliminating <span class="text-[#e6edf3]">15+ hours/week</span> of
-          manual data collection that used to take multiple people multiple days; and built OCI cleanup
-          automation that identified <span class="text-[#e6edf3]">$4,536/year in cloud waste</span> across
-          20+ customer compartments while replacing a tedious manual hunt across 8 regions.
+          Delivered: <span class="text-[#e6edf3]">Zabbix 4 → 7 migration</span> with zero monitoring gaps;
+          false-positive alert reduction through precision trigger engineering (response code + nodata conditions);
+          OCI DR Protection Groups replacing legacy backup-based failover with orchestrated RTO/RPO-measurable drills;
+          Python automation eliminating <span class="text-[#e6edf3]">15+ hours/week</span> of toil;
+          and OCI cleanup automation identifying <span class="text-[#e6edf3]">$4,536/year in cloud waste</span>
+          across 20+ compartments.
         </p>
         <p>
           Building platform engineering tooling at SymphonyAI — pursuing <span class="text-[#00ff88]">CKA</span> and
@@ -105,8 +105,13 @@ const latestPosts = posts
       <div class="space-y-3">
         <div class="border border-[#30363d] rounded-lg p-4 bg-[#161b22]">
           <div class="text-[#00ff88] font-mono text-xs uppercase tracking-widest mb-2">Currently</div>
-          <div class="text-[#e6edf3] text-sm">Senior Cloud Engineer @ SymphonyAI</div>
-          <div class="text-[#8b949e] text-xs mt-1">Apr 2026 – Present</div>
+          <div class="text-[#e6edf3] text-sm">Senior SRE / Cloud Engineer</div>
+          <div class="text-[#8b949e] text-xs mt-1">SymphonyAI · Apr 2026 – Present</div>
+        </div>
+        <div class="border border-[#30363d] rounded-lg p-4 bg-[#161b22]">
+          <div class="text-[#00ff88] font-mono text-xs uppercase tracking-widest mb-2">Previously</div>
+          <div class="text-[#e6edf3] text-sm">Cloud Engineer</div>
+          <div class="text-[#8b949e] text-xs mt-1">SymphonyAI · Mar 2023 – Mar 2026</div>
         </div>
         <div class="border border-[#30363d] rounded-lg p-4 bg-[#161b22]">
           <div class="text-[#00ff88] font-mono text-xs uppercase tracking-widest mb-2">Certified</div>
@@ -133,12 +138,14 @@ const latestPosts = posts
     <h2 class="text-3xl font-bold mb-10">Technical Stack</h2>
     <div class="grid md:grid-cols-2 gap-6">
       {[
-        { category: 'Cloud', items: ['AWS (EC2, S3, IAM, CloudWatch)', 'Azure (AZ-104, AZ-400)', 'OCI (Compute, Networking, DR)'] },
-        { category: 'IaC & Automation', items: ['Terraform', 'Ansible', 'Azure Bicep', 'Python (API automation)', 'Bash'] },
-        { category: 'Containers & Orchestration', items: ['Kubernetes', 'Docker', 'Amazon ECR', 'Amazon EKS'] },
-        { category: 'Observability', items: ['Prometheus', 'Grafana', 'Zabbix (v4→v7)', 'Azure Monitor', 'Centreon', 'JMX / Tomcat APM'] },
-        { category: 'CI/CD', items: ['Azure DevOps Pipelines', 'Git', 'YAML-based release automation'] },
-        { category: 'Incident Management', items: ['PagerDuty', 'Jira', 'RCA authoring', 'Production bridge facilitation'] },
+        { category: 'Cloud', items: ['AWS (EC2, S3, IAM, CloudWatch, EKS)', 'Azure (AZ-104, AZ-400)', 'OCI (Compute, Networking, DR)'] },
+        { category: 'IaC & Automation', items: ['Terraform', 'Ansible', 'Python (Zabbix API, OCI SDK)', 'Bash'] },
+        { category: 'Containers & Orchestration', items: ['Kubernetes', 'Docker', 'Amazon EKS', 'ArgoCD'] },
+        { category: 'Observability & SRE', items: ['Zabbix (SLI/SLO, v4→v7)', 'Grafana', 'Azure Monitor', 'Centreon', 'JMX APM', 'SLO tracking · MTTD/MTTR'] },
+        { category: 'CI/CD', items: ['Azure DevOps Pipelines', 'GitHub Actions', 'ArgoCD GitOps'] },
+        { category: 'Incident Management', items: ['PagerDuty', 'RCA authoring', 'Runbook creation', 'Production bridge facilitation'] },
+        { category: 'Networking', items: ['VPC', 'VPN', 'Load balancing', 'DNS', 'Security groups', 'Network peering', 'NAT'] },
+        { category: 'AI Tools', items: ['Claude', 'GitHub Copilot', 'Cursor'] },
       ].map((group) => (
         <div class="border border-[#30363d] rounded-lg p-5 bg-[#161b22]">
           <h3 class="font-mono text-[#00ff88] text-xs uppercase tracking-widest mb-3">{group.category}</h3>
