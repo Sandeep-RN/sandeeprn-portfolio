@@ -48,21 +48,6 @@ const latestPosts = posts
         ./contact
       </a>
     </div>
-
-    <div class="mt-20 grid grid-cols-2 md:grid-cols-4 gap-6">
-      {[
-        { value: '3.5+', label: 'Years in SRE' },
-        { value: '$4,536/yr', label: 'Cloud waste stopped' },
-        { value: '15+ hrs/wk', label: 'Recurring toil automated' },
-        { value: 'AZ-104 · AZ-400 · OCI', label: 'Certified', sub: 'CKA · TF Assoc in progress', small: true },
-      ].map((stat) => (
-        <div class="border border-[#30363d] rounded-lg p-4 bg-[#161b22]">
-          <div class={`font-mono text-[#00ff88] font-bold mb-1 ${'small' in stat ? 'text-sm' : 'text-xl'}`}>{stat.value}</div>
-          <div class="text-[#8b949e] text-xs uppercase tracking-wide">{stat.label}</div>
-          {'sub' in stat && <div class="font-mono text-[#8b949e] text-xs mt-1.5">{stat.sub}</div>}
-        </div>
-      ))}
-    </div>
   </section>
 
   <!-- About -->
@@ -130,6 +115,24 @@ const latestPosts = posts
           <div class="text-[#e6edf3] text-sm">Bengaluru, India</div>
         </div>
       </div>
+    </div>
+  </section>
+
+  <!-- Stats -->
+  <section class="max-w-5xl mx-auto px-6 pb-16">
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-6">
+      {[
+        { value: '3.5+', label: 'Years in SRE' },
+        { value: '$4,536/yr', label: 'Cloud waste stopped' },
+        { value: '15+ hrs/wk', label: 'Recurring toil automated' },
+        { value: 'AZ-104 · AZ-400 · OCI', label: 'Certified', sub: 'CKA · TF Assoc in progress', small: true },
+      ].map((stat) => (
+        <div class="border border-[#30363d] rounded-lg p-4 bg-[#161b22]">
+          <div class={`font-mono text-[#00ff88] font-bold mb-1 ${'small' in stat ? 'text-sm' : 'text-xl'}`}>{stat.value}</div>
+          <div class="text-[#8b949e] text-xs uppercase tracking-wide">{stat.label}</div>
+          {'sub' in stat && <div class="font-mono text-[#8b949e] text-xs mt-1.5">{stat.sub}</div>}
+        </div>
+      ))}
     </div>
   </section>
 
