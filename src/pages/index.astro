@@ -18,14 +18,14 @@ const latestPosts = posts
       Sandeep R N
     </h1>
     <div class="flex flex-wrap items-center gap-2 mb-6">
-      <span class="text-xl md:text-3xl text-[#8b949e] font-mono">SRE</span>
-      <span class="text-xl md:text-3xl text-[#00ff88] font-mono">→</span>
-      <span class="text-xl md:text-3xl text-[#e6edf3] font-mono">Platform Engineer</span>
+      <span class="text-xl md:text-3xl text-[#8b949e] font-mono">DevOps Engineer</span>
+      <span class="text-xl md:text-3xl text-[#00ff88] font-mono">·</span>
+      <span class="text-xl md:text-3xl text-[#e6edf3] font-mono">Site Reliability Engineer</span>
       <span class="cursor-blink"></span>
     </div>
     <p class="text-[#8b949e] text-lg max-w-2xl mb-10 leading-relaxed">
       Automation-first. Observability-driven. Multi-cloud.<br />
-      3+ years in SRE — building infra that scales, pipelines that ship, and dashboards that tell the truth.
+      3.5+ years in SRE/DevOps — building infra that scales, pipelines that ship, and dashboards that tell the truth.
     </p>
     <div class="flex flex-wrap gap-4">
       <a
@@ -138,13 +138,13 @@ const latestPosts = posts
     <h2 class="text-3xl font-bold mb-10">Technical Stack</h2>
     <div class="grid md:grid-cols-2 gap-6">
       {[
-        { category: 'Cloud', items: ['AWS (EC2, S3, IAM, CloudWatch, EKS)', 'Azure (AZ-104, AZ-400)', 'OCI (Compute, Networking, DR)'] },
-        { category: 'IaC & Automation', items: ['Terraform', 'Ansible', 'Python (Zabbix API, OCI SDK)', 'Bash'] },
-        { category: 'Containers & Orchestration', items: ['Kubernetes', 'Docker', 'Amazon EKS', 'ArgoCD'] },
-        { category: 'Observability & SRE', items: ['Zabbix (SLI/SLO, v4→v7)', 'Grafana', 'Azure Monitor', 'Centreon', 'JMX APM', 'SLO tracking · MTTD/MTTR'] },
-        { category: 'CI/CD', items: ['Azure DevOps Pipelines', 'GitHub Actions', 'ArgoCD GitOps'] },
-        { category: 'Incident Management', items: ['PagerDuty', 'RCA authoring', 'Runbook creation', 'Production bridge facilitation'] },
-        { category: 'Networking', items: ['VPC', 'VPN', 'Load balancing', 'DNS', 'Security groups', 'Network peering', 'NAT'] },
+        { category: 'Cloud', items: ['AWS (EKS, EC2, S3, IAM, VPC, ALB, ECR, Route53, CloudWatch)', 'Azure (AZ-104, AZ-400)', 'OCI (Compute, Networking, DR)'] },
+        { category: 'IaC & Config Mgmt', items: ['Terraform', 'Ansible', 'Python (Zabbix API, OCI SDK)', 'Bash'] },
+        { category: 'Containers & Orchestration', items: ['Kubernetes', 'Docker', 'Docker Compose', 'Amazon EKS', 'ArgoCD'] },
+        { category: 'Observability & SRE', items: ['Zabbix (SLI/SLO, v4→v7)', 'Prometheus', 'Grafana', 'OpenTelemetry', 'Azure Monitor', 'Centreon', 'JMX APM'] },
+        { category: 'CI/CD & GitOps', items: ['GitHub Actions', 'Azure DevOps Pipelines', 'ArgoCD'] },
+        { category: 'SRE Practices', items: ['SLI/SLO', 'Incident Management', 'RCA authoring', 'On-call', 'Runbooks', 'Change Management'] },
+        { category: 'OS & Networking', items: ['Linux (RHEL, CentOS, Ubuntu)', 'VPC', 'DNS', 'Load Balancing', 'VPN', 'Firewalls', 'NAT'] },
         { category: 'AI Tools', items: ['Claude', 'GitHub Copilot', 'Cursor'] },
       ].map((group) => (
         <div class="border border-[#30363d] rounded-lg p-5 bg-[#161b22]">

@@ -1,17 +1,17 @@
 ﻿---
-title: "E-Commerce DevOps on AWS EKS"
-description: "End-to-end DevOps implementation for a multi-microservice e-commerce app: EKS via Terraform, ArgoCD GitOps, GitHub Actions CI/CD, Route53 custom domain."
-tags: ["Terraform", "EKS", "AWS", "IaC", "Kubernetes", "ArgoCD", "GitHub Actions"]
-status: "in-progress"
-date: "2026-06"
+title: "E-Commerce Microservices Platform on AWS EKS"
+description: "End-to-end DevOps for a 10+ service microservices app: 3-AZ EKS via Terraform, GitHub Actions CI, ArgoCD GitOps, ALB Ingress, OpenTelemetry + Prometheus + Grafana observability."
+tags: ["Terraform", "EKS", "AWS", "Kubernetes", "ArgoCD", "GitHub Actions", "Prometheus", "Grafana"]
+status: "done"
+date: "2026-09"
 github: "https://github.com/Sandeep-RN/sandeeprn-portfolio"
 ---
 
 ## Overview
 
-End-to-end DevOps implementation for a multi-microservice e-commerce application — covering infrastructure provisioning, container orchestration, GitOps deployment, CI/CD pipelines, and DNS routing. This covers the full Platform Engineering stack: IaC → cluster → workloads → GitOps → CI/CD → custom domain.
+End-to-end DevOps implementation for a 10+ service microservices e-commerce application — infrastructure provisioning, container orchestration, GitOps deployment, CI/CD pipeline, and full observability stack. The goal: demonstrate the complete platform engineering workflow, not just isolated pieces.
 
-> **Status:** In progress as part of a structured course on Terraform and AWS. Remote backend (S3 + DynamoDB) and EKS provisioning complete. ArgoCD and GitHub Actions CI/CD wired up.
+Stack: **Terraform → EKS → Docker → GitHub Actions CI → ArgoCD GitOps → OpenTelemetry + Prometheus + Grafana**
 
 ## Infrastructure Design
 
@@ -20,117 +20,179 @@ End-to-end DevOps implementation for a multi-microservice e-commerce application
 |                      AWS Account                      |
 |                                                       |
 |  +-------------------------------------------------+  |
-|  |                VPC (10.0.0.0/16)                |  |
+|  |           VPC (10.0.0.0/16)  —  3 AZs          |  |
 |  |                                                 |  |
-|  |  +--------------+    +--------------+           |  |
-|  |  |Public Subnet |    |Public Subnet |           |  |
-|  |  | ap-south-1a  |    | ap-south-1b  |           |  |
-|  |  +------+-------+    +------+-------+           |  |
-|  |         | NAT GW            | NAT GW            |  |
-|  |  +------v-------+    +------v-------+           |  |
-|  |  |Private Subnet|    |Private Subnet|           |  |
-|  |  |  EKS Nodes   |    |  EKS Nodes   |           |  |
-|  |  +--------------+    +--------------+           |  |
+|  |  +----------+  +----------+  +----------+       |  |
+|  |  |Public    |  |Public    |  |Public    |       |  |
+|  |  |Subnet 1a |  |Subnet 1b |  |Subnet 1c |       |  |
+|  |  +----+-----+  +----+-----+  +----+-----+       |  |
+|  |       | NAT GW      | NAT GW      | NAT GW       |  |
+|  |  +----v-----+  +----v-----+  +----v-----+       |  |
+|  |  |Private   |  |Private   |  |Private   |       |  |
+|  |  |EKS Nodes |  |EKS Nodes |  |EKS Nodes |       |  |
+|  |  +----------+  +----------+  +----------+       |  |
 |  +-------------------------------------------------+  |
 |                                                       |
-|  EKS Control Plane (managed)                          |
-|  Node Group: t3.medium × 2 (min 1, max 4)             |
+|  EKS 1.30 Control Plane (managed)                     |
+|  Node Group: autoscaling 1-4  (private subnets)       |
+|  ALB Ingress — internet-facing via LB Controller      |
 +-------------------------------------------------------+
 
   Remote State:
-  S3 bucket: sandeeprn-tf-state
-  DynamoDB:  sandeeprn-tf-lock
+  S3 bucket (versioned + encrypted) + DynamoDB lock table
 ```
 
-## Remote Backend (Complete)
+## Terraform Infrastructure
 
-The first piece — remote state with locking prevents concurrent applies from corrupting state:
-
-```hcl
-# backend.tf
-terraform {
-  backend "s3" {
-    bucket         = "sandeeprn-tf-state"
-    key            = "eks-cluster/terraform.tfstate"
-    region         = "ap-south-1"
-    dynamodb_table = "sandeeprn-tf-lock"
-    encrypt        = true
-  }
-}
-```
-
-The S3 bucket and DynamoDB table are themselves provisioned by a separate bootstrap Terraform config — state for the state backend is local only:
-
-```hcl
-# bootstrap/main.tf
-resource "aws_s3_bucket" "tf_state" {
-  bucket = "sandeeprn-tf-state"
-}
-
-resource "aws_s3_bucket_versioning" "tf_state" {
-  bucket = aws_s3_bucket.tf_state.id
-  versioning_configuration { status = "Enabled" }
-}
-
-resource "aws_dynamodb_table" "tf_lock" {
-  name         = "sandeeprn-tf-lock"
-  billing_mode = "PAY_PER_REQUEST"
-  hash_key     = "LockID"
-  attribute {
-    name = "LockID"
-    type = "S"
-  }
-}
-```
-
-## EKS Cluster (In Progress)
-
-Using the official `terraform-aws-modules/eks` and `terraform-aws-modules/vpc` modules:
+3-AZ VPC with public/private subnets, per-AZ NAT gateways, ELB subnet tagging, and IAM roles:
 
 ```hcl
 module "vpc" {
   source  = "terraform-aws-modules/vpc/aws"
   version = "~> 5.0"
 
-  name = "sandeeprn-eks-vpc"
+  name = "ecommerce-eks-vpc"
   cidr = "10.0.0.0/16"
 
-  azs             = ["ap-south-1a", "ap-south-1b"]
-  private_subnets = ["10.0.1.0/24", "10.0.2.0/24"]
-  public_subnets  = ["10.0.101.0/24", "10.0.102.0/24"]
+  azs             = ["ap-south-1a", "ap-south-1b", "ap-south-1c"]
+  private_subnets = ["10.0.1.0/24", "10.0.2.0/24", "10.0.3.0/24"]
+  public_subnets  = ["10.0.101.0/24", "10.0.102.0/24", "10.0.103.0/24"]
 
   enable_nat_gateway = true
-  single_nat_gateway = true  # cost optimisation for non-prod
+  single_nat_gateway = false  # per-AZ for HA
 
-  tags = {
-    "kubernetes.io/cluster/sandeeprn-eks" = "shared"
-  }
+  # Required for AWS Load Balancer Controller
+  public_subnet_tags  = { "kubernetes.io/role/elb" = 1 }
+  private_subnet_tags = { "kubernetes.io/role/internal-elb" = 1 }
 }
 
 module "eks" {
   source  = "terraform-aws-modules/eks/aws"
   version = "~> 20.0"
 
-  cluster_name    = "sandeeprn-eks"
+  cluster_name    = "ecommerce-eks"
   cluster_version = "1.30"
-
-  vpc_id     = module.vpc.vpc_id
-  subnet_ids = module.vpc.private_subnets
+  subnet_ids      = module.vpc.private_subnets
 
   eks_managed_node_groups = {
     general = {
-      desired_size   = 2
       min_size       = 1
       max_size       = 4
+      desired_size   = 2
       instance_types = ["t3.medium"]
     }
   }
 }
 ```
 
+Remote backend — S3 with versioning + encryption, DynamoDB for state locking:
+
+```hcl
+terraform {
+  backend "s3" {
+    bucket         = "ecommerce-tf-state"
+    key            = "eks/terraform.tfstate"
+    region         = "ap-south-1"
+    dynamodb_table = "ecommerce-tf-lock"
+    encrypt        = true
+  }
+}
+```
+
+## Kubernetes Workloads
+
+10+ microservices deployed with Deployments, Services, ServiceAccounts, and resource limits. Internet-facing traffic routed via ALB Ingress through the AWS Load Balancer Controller:
+
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ecommerce-ingress
+  annotations:
+    kubernetes.io/ingress.class: alb
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+spec:
+  rules:
+    - http:
+        paths:
+          - path: /api/orders
+            pathType: Prefix
+            backend:
+              service:
+                name: order-service
+                port:
+                  number: 80
+          - path: /api/products
+            pathType: Prefix
+            backend:
+              service:
+                name: product-service
+                port:
+                  number: 80
+```
+
+## GitHub Actions CI Pipeline
+
+Build → test → lint → Docker Buildx push → manifest update, tagged by run ID:
+
+```yaml
+name: CI
+on:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run unit tests
+        run: go test ./...
+
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v4
+
+      - name: Build and push (Docker Buildx)
+        uses: docker/build-push-action@v5
+        with:
+          push: true
+          tags: ${{ secrets.ECR_REGISTRY }}/order-service:${{ github.run_id }}
+          platforms: linux/amd64,linux/arm64
+
+      - name: Update manifest
+        run: |
+          sed -i "s|image:.*|image: $ECR_REGISTRY/order-service:${{ github.run_id }}|" \
+            k8s/order-service/deployment.yaml
+          git commit -am "ci: bump order-service to ${{ github.run_id }}"
+          git push
+```
+
+ArgoCD polls the repo and syncs the cluster on manifest change — no imperative `kubectl apply` in CI.
+
+## Observability Stack
+
+OpenTelemetry SDK instrumented in each service → Prometheus scraping → Grafana dashboards:
+
+```yaml
+# Prometheus scrape config for services exposing /metrics
+- job_name: 'ecommerce-services'
+  kubernetes_sd_configs:
+    - role: pod
+  relabel_configs:
+    - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+      action: keep
+      regex: true
+```
+
+Grafana dashboards cover request rate, error rate, and latency (RED metrics) per service.
+
 ## What This Demonstrates
 
-- **IaC best practices** — remote state, state locking, module reuse over hand-rolled resources
-- **EKS architecture** — private node groups, NAT gateway, proper subnet tagging for Kubernetes
-- **Terraform module usage** — community modules vs writing everything from scratch (the right call for well-tested infra patterns)
-- **Cost awareness** — single NAT gateway for non-prod, PAY_PER_REQUEST DynamoDB, right-sized nodes
+- **IaC at production scale** — 3-AZ VPC, per-AZ NAT gateways, ELB subnet tagging, remote state with encryption and locking
+- **Kubernetes operations** — Deployments, Services, ServiceAccounts, resource limits, ALB Ingress via AWS Load Balancer Controller
+- **CI/CD pipeline** — GitHub Actions with unit tests, linting (golangci-lint), Docker Buildx multi-arch build, image tagging by run ID, manifest update
+- **GitOps** — ArgoCD syncs from git; cluster state is always declarative, never imperative
+- **Observability** — OpenTelemetry instrumentation, Prometheus scraping, Grafana RED dashboards across 10+ services
+- **Cost awareness** — right-sized nodes, autoscaling 1–4, S3/DynamoDB PAY_PER_REQUEST for state backend
