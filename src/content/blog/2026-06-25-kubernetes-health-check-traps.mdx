@@ -1,0 +1,182 @@
+---
+title: "The Kubernetes Health Check Traps That Bite Production Clusters"
+description: "Liveness, readiness, and startup probes sound simple — until they silently route traffic to broken pods at 2am."
+tags: ["Kubernetes", "SRE", "DevOps", "Production", "Observability"]
+date: "2026-06-25"
+---
+
+Your pod shows `Running`. Your app is returning 500s. Kubernetes keeps sending traffic to it.
+
+This is one of the most dangerous states in a production cluster — and it's almost always a misconfigured (or missing) health probe. I've debugged this pattern across multiple clusters, and the fix is almost never complicated. The problem is that most engineers don't think about probes until something breaks at 2am.
+
+Here's what I've learned.
+
+---
+
+## The Three Probes, and Why They're All Different Jobs
+
+Kubernetes ships three probe types. Most teams use one. Some use two. Almost nobody thinks hard about all three until they've been burned.
+
+| Probe | Question it answers | On failure |
+|---|---|---|
+| `livenessProbe` | Is this process still alive? | Kill and restart the container |
+| `readinessProbe` | Is this pod ready to serve traffic? | Remove from Service endpoints |
+| `startupProbe` | Has the app finished starting up? | Hold off liveness/readiness checks |
+
+The critical insight: **these are independent signals for independent decisions**. Kubernetes uses them at different points in a pod's lifecycle, and conflating them is how you end up routing traffic to broken pods.
+
+---
+
+## Trap 1 — Liveness Without Readiness
+
+The most common mistake. You configure a `livenessProbe` on port 8080, and call it done.
+
+```yaml
+livenessProbe:
+  httpGet:
+    path: /healthz
+    port: 8080
+  initialDelaySeconds: 10
+  periodSeconds: 10
+```
+
+Here's what goes wrong: the pod restarts after a crash, the process starts, `/healthz` returns 200 (it always does — it's just checking if the HTTP server is up), and Kubernetes immediately routes traffic to it. But your app hasn't finished loading its config, warming its cache, or connecting to the database. You're sending real user traffic to a half-initialized pod.
+
+**Fix:** Always configure `readinessProbe` separately, pointing to an endpoint that actually validates app-layer readiness — database connectivity, config loaded, cache warmed.
+
+```yaml
+livenessProbe:
+  httpGet:
+    path: /healthz
+    port: 8080
+  periodSeconds: 10
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /ready
+    port: 8080
+  initialDelaySeconds: 5
+  periodSeconds: 5
+  failureThreshold: 2
+```
+
+The `/ready` endpoint should check downstream dependencies. `/healthz` should just confirm the process is alive. These are different things. Write two handlers.
+
+---
+
+## Trap 2 — Missing `startupProbe` for Slow-Starting Apps
+
+JVM apps, Python services loading large ML models, anything that reads gigabytes of config on boot — they all share the same problem: they take longer to start than `initialDelaySeconds` accounts for.
+
+Without `startupProbe`, here's what happens:
+1. Pod starts
+2. Liveness probe fires after `initialDelaySeconds`
+3. App isn't ready yet — probe fails
+4. Kubernetes kills the pod and restarts it
+5. Repeat forever — pod never escapes the crash loop
+
+The workaround most teams reach for is increasing `initialDelaySeconds` to something large like 120. That works, but it means a genuinely crashed pod takes 2 minutes to get restarted.
+
+**Better approach:** use `startupProbe` to gate the liveness/readiness checks until the app signals it's done starting.
+
+```yaml
+startupProbe:
+  httpGet:
+    path: /healthz
+    port: 8080
+  failureThreshold: 30   # 30 * 10s = up to 5 minutes to start
+  periodSeconds: 10
+
+livenessProbe:
+  httpGet:
+    path: /healthz
+    port: 8080
+  periodSeconds: 10
+  failureThreshold: 3    # tight failure window once running
+```
+
+`startupProbe` runs until it either succeeds or hits `failureThreshold`. Only after it succeeds do liveness and readiness checks kick in. This gives slow apps the runway they need while keeping a tight leash on them once they're running.
+
+---
+
+## Trap 3 — `minReadySeconds` is Zero by Default
+
+A pod becomes `Ready` the moment its readiness probe passes — once. Then Kubernetes immediately considers it eligible for traffic and rolls the deployment forward.
+
+For most apps this is fine. For apps with initialization that completes asynchronously (background workers, connection pool warmup, event consumers), the first successful probe check might fire before the app is truly stable.
+
+`minReadySeconds` tells Kubernetes: "don't consider this pod available until it has been continuously ready for N seconds."
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+spec:
+  minReadySeconds: 15   # pod must stay ready for 15s before deployment advances
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+```
+
+Setting this to 15–30 seconds adds a small deployment delay but catches the "passed one probe check then immediately crashed" failure mode before it rolls to all replicas.
+
+---
+
+## A Production Pattern Worth Stealing
+
+Here's the probe config we settled on for stateful microservices — the ones that connect to databases and message queues on startup:
+
+```yaml
+startupProbe:
+  httpGet:
+    path: /healthz/startup
+    port: 8080
+  failureThreshold: 24
+  periodSeconds: 5        # 2 minutes max startup window
+
+livenessProbe:
+  httpGet:
+    path: /healthz/live
+    port: 8080
+  periodSeconds: 10
+  failureThreshold: 3
+  timeoutSeconds: 3
+
+readinessProbe:
+  httpGet:
+    path: /healthz/ready
+    port: 8080
+  periodSeconds: 5
+  failureThreshold: 2
+  successThreshold: 1
+  timeoutSeconds: 2
+```
+
+Three endpoints, three probe types, clearly separated responsibilities. The app owns its health contract; Kubernetes enforces it.
+
+---
+
+## What to Add to Your Observability Stack
+
+Probes only help if you're watching them. Add these to your Grafana dashboards:
+
+```promql
+# Pods that are running but not ready
+kube_pod_status_ready{condition="false"} == 1
+
+# Restart rate by deployment
+rate(kube_pod_container_status_restarts_total[5m]) > 0
+
+# Pods stuck in unscheduled/pending
+kube_pod_status_phase{phase="Pending"} > 0
+```
+
+Alert on restart rate. Alert on `Ready=False` pods that persist beyond your `minReadySeconds` window. This is the feedback loop that catches misconfigured probes before they page you at 2am.
+
+---
+
+## TL;DR
+
+Liveness, readiness, and startup probes are separate tools for separate jobs — don't collapse them into one endpoint with one check. Use `startupProbe` for anything that takes more than 30 seconds to initialize. Set `minReadySeconds` on deployments where transient readiness is a risk. And instrument the pod lifecycle in Prometheus so you're not finding out about broken pods from users.

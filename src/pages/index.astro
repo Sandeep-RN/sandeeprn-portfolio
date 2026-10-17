@@ -94,18 +94,19 @@ const latestPosts = posts
           OCI DR Protection Groups replacing legacy backup-based failover with orchestrated RTO/RPO-measurable drills;
           Python automation eliminating <span class="text-[#e6edf3]">15+ hours/week</span> of toil;
           and OCI cleanup automation identifying <span class="text-[#e6edf3]">$4,536/year in cloud waste</span>
-          across 20+ compartments.
+          across 20+ compartments. I also run production releases for Java/Apache services — WAR/JAR
+          rollouts and rollbacks, and log-based troubleshooting of JVM memory, GC pressure, and 5xx spikes.
         </p>
         <p>
-          Building platform engineering tooling at SymphonyAI — pursuing <span class="text-[#00ff88]">CKA</span> and
-          <span class="text-[#00ff88]">Terraform Associate</span>, and building IaC and containerisation
-          projects that reflect the work, not just the certs.
+          Outside work I build the DevOps side end to end — Terraform-provisioned EKS, GitHub Actions CI,
+          ArgoCD GitOps — and I'm pursuing <span class="text-[#00ff88]">CKA</span> and
+          <span class="text-[#00ff88]">Terraform Associate</span> to certify what I already run.
         </p>
       </div>
       <div class="space-y-3">
         <div class="border border-[#30363d] rounded-lg p-4 bg-[#161b22]">
           <div class="text-[#00ff88] font-mono text-xs uppercase tracking-widest mb-2">Currently</div>
-          <div class="text-[#e6edf3] text-sm">Senior SRE / Cloud Engineer</div>
+          <div class="text-[#e6edf3] text-sm">Senior Cloud Engineer (SRE)</div>
           <div class="text-[#8b949e] text-xs mt-1">SymphonyAI · Apr 2026 – Present</div>
         </div>
         <div class="border border-[#30363d] rounded-lg p-4 bg-[#161b22]">
@@ -121,8 +122,8 @@ const latestPosts = posts
         </div>
         <div class="border border-[#30363d] rounded-lg p-4 bg-[#161b22]">
           <div class="text-[#00ff88] font-mono text-xs uppercase tracking-widest mb-2">In Progress</div>
-          <div class="text-[#e6edf3] text-sm">CKA — 15%</div>
-          <div class="text-[#e6edf3] text-sm mt-1">TF Associate — 28%</div>
+          <div class="text-[#e6edf3] text-sm">CKA — 50%</div>
+          <div class="text-[#e6edf3] text-sm mt-1">TF Associate — 65%</div>
         </div>
         <div class="border border-[#30363d] rounded-lg p-4 bg-[#161b22]">
           <div class="text-[#00ff88] font-mono text-xs uppercase tracking-widest mb-2">Based in</div>
@@ -177,17 +178,17 @@ const latestPosts = posts
         },
         {
           title: 'Monitoring Stack: Zabbix Migration & Automation',
-          tags: ['Zabbix', 'Python', 'Ansible', 'Prometheus'],
-          desc: 'Led Zabbix 4 → 7 migration with zero monitoring gaps across 1000+ servers. Built Python automation eliminating 15+ hrs/week of manual daily, weekly, and monthly reporting.',
+          tags: ['Zabbix', 'Python', 'Ansible', 'SLI/SLO'],
+          desc: 'SLI tracking for a 99.95% uptime SLO across 15k+ checks. Zabbix 4 → 7 migration with zero gaps across 1000+ servers, plus Python automation eliminating 15+ hrs/week of toil.',
           slug: 'monitoring-stack',
           done: true,
         },
         {
-          title: 'EKS Cluster via Terraform',
-          tags: ['Terraform', 'EKS', 'AWS', 'IaC'],
-          desc: 'Production-style EKS cluster provisioned using Terraform VPC and EKS modules with remote state in S3 + DynamoDB locking.',
+          title: 'E-Commerce Microservices Platform on AWS EKS',
+          tags: ['Terraform', 'EKS', 'GitHub Actions', 'ArgoCD'],
+          desc: '10+ service app on a 3-AZ EKS cluster built with Terraform — GitHub Actions CI, ArgoCD GitOps, ALB Ingress, and OpenTelemetry + Prometheus + Grafana observability.',
           slug: 'eks-terraform',
-          done: false,
+          done: true,
         },
         {
           title: 'Docker Multi-Service App → ECR',
@@ -264,7 +265,7 @@ const latestPosts = posts
     <p class="font-mono text-[#00ff88] text-sm mb-2 tracking-widest uppercase">$ ./contact.sh</p>
     <h2 class="text-3xl font-bold mb-4">Let's Connect</h2>
     <p class="text-[#8b949e] mb-8 max-w-lg">
-      Open to Platform Engineering, DevOps, and Site Reliability Engineering roles. Based in Bengaluru — open to remote.
+      Open to DevOps, Site Reliability, and Platform Engineering roles. Based in Bengaluru — open to remote.
     </p>
     <div class="flex flex-wrap gap-4">
       <a

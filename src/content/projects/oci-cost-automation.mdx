@@ -141,13 +141,13 @@ Post-deletion apply email shows actual deleted count, skipped (held) count, and 
 |                                                              |
 |  +-----------+   +------------+   +-----------------+        |
 |  | Discovery |   |Safety Gates|   |Cost Calculation |        |
-|  |All regions| → | Hold tags  | → |$0.0425/GB-month |        |
+|  |All regions| > | Hold tags  | > |$0.0425/GB-month |        |
 |  |All compts |   |Expiry parse|   | Per-compartment |        |
 |  +-----------+   +------------+   +-----------------+        |
 |                                                              |
 |  +-----------+   +------------+   +-----------------+        |
 |  |   Plan    |   |   Apply    |   |  Email Report   |        |
-|  |CSV + JSON | → |Delete + log| → |  HTML + Excel   |        |
+|  |CSV + JSON | > |Delete + log| > |  HTML + Excel   |        |
 |  |Review step|   |Verified del|   |Executive summary|        |
 |  +-----------+   +------------+   +-----------------+        |
 +--------------------------------------------------------------+

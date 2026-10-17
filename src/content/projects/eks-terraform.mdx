@@ -20,13 +20,13 @@ Stack: **Terraform → EKS → Docker → GitHub Actions CI → ArgoCD GitOps �
 |                      AWS Account                      |
 |                                                       |
 |  +-------------------------------------------------+  |
-|  |           VPC (10.0.0.0/16)  —  3 AZs          |  |
+|  |            VPC (10.0.0.0/16) - 3 AZs            |  |
 |  |                                                 |  |
 |  |  +----------+  +----------+  +----------+       |  |
 |  |  |Public    |  |Public    |  |Public    |       |  |
 |  |  |Subnet 1a |  |Subnet 1b |  |Subnet 1c |       |  |
 |  |  +----+-----+  +----+-----+  +----+-----+       |  |
-|  |       | NAT GW      | NAT GW      | NAT GW       |  |
+|  |       | NAT GW      | NAT GW      | NAT GW      |  |
 |  |  +----v-----+  +----v-----+  +----v-----+       |  |
 |  |  |Private   |  |Private   |  |Private   |       |  |
 |  |  |EKS Nodes |  |EKS Nodes |  |EKS Nodes |       |  |
@@ -35,7 +35,7 @@ Stack: **Terraform → EKS → Docker → GitHub Actions CI → ArgoCD GitOps �
 |                                                       |
 |  EKS 1.30 Control Plane (managed)                     |
 |  Node Group: autoscaling 1-4  (private subnets)       |
-|  ALB Ingress — internet-facing via LB Controller      |
+|  ALB Ingress - internet-facing via LB Controller      |
 +-------------------------------------------------------+
 
   Remote State:
