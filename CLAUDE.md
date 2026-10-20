@@ -62,3 +62,17 @@ For visual changes, run the dev server (`npm run dev`), measure with `getBoundin
 - GitHub profile README: repo `Sandeep-RN/Sandeep-RN`, local copy at `C:\Users\SandeepNagaraj\Projects\README_github.md`. Update it with `gh api` PUT (base64 content plus the current sha). Keep it in sync with the portfolio (title, projects, cert progress).
 - Cert progress shown in two places that must match: `src/pages/certifications.astro` and the About sidebar in `src/pages/index.astro`.
 - Windows + PowerShell environment: no `tail`, no `&&`, no heredocs for git messages.
+
+## Agent skills
+
+### Issue tracker
+
+Issues are tracked in GitHub Issues for Sandeep-RN/sandeeprn-portfolio (via `gh`). See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Default five-label vocabulary (needs-triage, needs-info, ready-for-agent, ready-for-human, wontfix). See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: one `GLOSSARY.md` + `docs/adr/` at the repo root. See `docs/agents/domain.md`.
