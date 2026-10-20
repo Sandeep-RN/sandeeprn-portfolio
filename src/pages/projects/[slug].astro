@@ -41,9 +41,10 @@ const { Content } = await render(project);
       </div>
       <h1 class="text-4xl font-bold text-[#e6edf3] mb-4">{project.data.title}</h1>
       <p class="text-[#8b949e] text-lg mb-6">{project.data.description}</p>
-      <div class="flex flex-wrap gap-2 mb-6">
+      <div class="flex flex-wrap items-center gap-2 mb-6">
+        <span class="font-mono text-xs text-[#00ff88] uppercase tracking-widest mr-1">Stack</span>
         {project.data.tags.map((tag: string) => (
-          <span class="px-3 py-1 bg-[#0d1117] border border-[#30363d] rounded text-[#e6edf3] text-sm font-mono">
+          <span class="px-3 py-1 bg-[#0d1117] border border-[#00ff8840] rounded text-[#e6edf3] text-sm font-mono">
             {tag}
           </span>
         ))}

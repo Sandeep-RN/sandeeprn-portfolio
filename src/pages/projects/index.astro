@@ -29,9 +29,10 @@ const sorted = projects.sort((a, b) => (a.data.status === 'done' ? -1 : 1));
             )}
           </div>
           <p class="text-[#8b949e] text-sm mb-4 leading-relaxed">{project.data.description}</p>
-          <div class="flex flex-wrap gap-2">
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="font-mono text-[10px] text-[#00ff88] uppercase tracking-widest mr-1">Stack</span>
             {project.data.tags.map((tag: string) => (
-              <span class="px-2 py-0.5 text-xs font-mono text-[#8b949e] border border-[#30363d] rounded">
+              <span class="px-2 py-0.5 text-xs font-mono text-[#e6edf3] bg-[#0d1117] border border-[#00ff8840] rounded">
                 {tag}
               </span>
             ))}

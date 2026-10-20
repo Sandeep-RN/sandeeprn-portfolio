@@ -193,3 +193,9 @@ No long-lived API keys on the box — if the instance is compromised, the blast 
 - **OCI SDK depth** — BlockstorageClient, ComputeClient, IdentityClient, compartment hierarchy traversal, region enumeration.
 - **Runs unattended** — weekly cron with Instance Principals auth (no stored credentials), plan/apply separated by a 24h human-review window.
 - **Least-privilege IAM** — dynamic group scoped to exactly the permissions the job needs, nothing more.
+
+---
+
+## Related Write-up
+
+The full story, including the safety gates and code walkthrough: [Finding ~$4.5k/year in OCI Cloud Waste with Python](/blog/oci-cost-automation).
