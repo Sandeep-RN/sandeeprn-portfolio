@@ -22,3 +22,6 @@ pnpm-debug.log*
 
 # jetbrains setting folder
 .idea/
+
+# Local VS Code workspace
+/sandeeprn-portfolio.code-workspace
