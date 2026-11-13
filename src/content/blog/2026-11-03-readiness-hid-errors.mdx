@@ -1,0 +1,94 @@
+---
+title: "My Dashboard Said 6% Errors. My Users Saw About 10%."
+description: "A readiness probe that checked the database pulled every pod out of the Service during an outage, so failed requests never reached my SLO metrics."
+tags: ["Kubernetes", "SRE", "SLO", "Observability", "DevOps"]
+date: "2026-11-03"
+---
+
+My dashboard said 6% errors. My users saw about 10%.
+
+This is from my personal OCI Kubernetes GitOps project. I'd written SLO burn-rate alerts for a link-shortener API, and I wanted to see them fire. So I tested them by breaking the database on purpose.
+
+---
+
+## The Test
+
+On the OKE cluster, I sent steady redirect traffic through the public load balancer, about 0.73 requests per second. Then I deleted the `postgres-0` pod three times, at 01:07:28, 01:08:24 and 01:09:20 IST.
+
+Two views of the same test:
+
+| | Result |
+|---|---|
+| Client view | 471 requests: 447 redirects, **16 × 503**, **8 × no response** (curl `000`, about 0.2 s) |
+| Server view (the SLO's error ratio) | peaked at **0.06** |
+
+24 requests failed. 8 of them never got an HTTP response at all. And the server-side metrics only knew about 16 of the 24, because the other 8 never reached my app.
+
+---
+
+## Why 8 Requests Disappeared
+
+Every outage followed the same sequence:
+
+1. Postgres goes down. The app returns fast 503s, as designed.
+2. After about 3 failed readiness probes, both backend pods leave the Service at once, because `/readyz` checks the database.
+3. With zero endpoints left, the load balancer path refuses connections in 0.2 s. That's the `000`.
+4. The pods rejoin only after their next successful probe, a few seconds after Postgres is back.
+
+Step 3 is the problem. Those refused connections never touch my code, so my request metrics never count them.
+
+Taking a pod out of the Service helps when another pod is healthy. With a shared database, every pod is equally broken. There's nothing to fail over to. The probe gains nothing and hides the errors from the one place that was supposed to see them.
+
+---
+
+## The Fix
+
+ADR 0016 changes what readiness means: `/readyz` checks only what belongs to the pod. Today that's one check, "this pod's connection pool is open", which also takes the pod out of the Service during shutdown.
+
+A database outage is now a fast 503 that stays in the Service, gets counted by the SLO, and drives the alerts. When Postgres comes back, there's no probe delay to wait out.
+
+The pods can now be "ready" while unable to serve a successful response. The ADR says it plainly: readiness means "send me traffic", not "everything works". Rollouts also no longer wait for the database: a new pod becomes ready during an outage, which is fine here because old and new pods would fail the same way.
+
+One more change was needed. The schema used to be created at startup. A pod that started while Postgres was down would now be "ready" without a schema. So the first request that reaches the database creates the table if startup couldn't (`CREATE TABLE IF NOT EXISTS`, still under an advisory lock).
+
+I wrote the tests first. `/readyz` stays 200 in under 0.5 s while the database hangs, and it ignores a store whose readiness check raises. The first-use schema test uses a real Postgres, and I checked it by mutation: without the first-use schema call, the test fails. Locally that was 41 unit tests and 6 of 6 integration tests.
+
+---
+
+## Same Test After the Fix
+
+Same three pod deletes, same traffic, after deploying the change:
+
+| | Before | After |
+|---|---|---|
+| Requests | 471 | 669 |
+| No response (`000`) | 8 | **0** |
+| 503 (counted by the SLI) | 16 | 17 |
+| Server-side vs client-side error ratio | 6% vs about 10% | **6.9% vs about 7%** |
+| Slowest error | 2.3 s | 2.45 s |
+
+The two views now agree, and every failure is a fast, counted 503.
+
+---
+
+## The Alert Still Didn't Fire, and That Was Correct
+
+The fast-burn alert did not fire in either run. At first I treated that as a failure. It wasn't.
+
+The fast alert needs an error ratio above 7.2% over the last hour as well as over the last 5 minutes. Three 15-second blips are about 2.5% of an hour's requests. The weekly error budget is roughly 50 minutes of downtime, so 45 seconds of blips shouldn't page anyone. My test was wrong, not the alert.
+
+So I ran a different test: one sustained 5-minute outage, with the database refusing the app's connections. This time the fast-burn alert fired, a notification reached Discord, and the alert resolved after the database was allowed back. During that run: 450 requests, 109 × 503, **0 unanswered**.
+
+---
+
+## Still Unsure
+
+After the database came back, the app kept returning 503s for about 30 more seconds. It looks like reconnect backoff in the connection pool, but I haven't checked.
+
+---
+
+A readiness probe on a shared dependency doesn't protect users. It hides the outage from you.
+
+The decision and its reasoning: [ADR 0016, readiness checks pod-local state only](https://github.com/Sandeep-RN/oci-k8s-gitops-demo/blob/main/docs/adr/0016-readiness-checks-pod-local-state-only.md). The code change: [app PR 14](https://github.com/Sandeep-RN/oci-k8s-gitops-demo-app/pull/14).
+
+*Originally posted on LinkedIn: [My dashboard said 6% errors. My users saw about 10%.](https://lnkd.in/p/dN8vzkfh)*
