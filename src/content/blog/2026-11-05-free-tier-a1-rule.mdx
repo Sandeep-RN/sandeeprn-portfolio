@@ -1,0 +1,84 @@
+---
+title: "On Oracle's Free Tier, the Expensive Mistake Isn't a Bill. It's Losing a VM You Can't Get Back."
+description: "Holding more Always Free A1 than allowed can disable every A1 instance, not just the extra. I made that mistake fail at terraform plan."
+tags: ["OCI", "Terraform", "Cloud Cost", "DevOps"]
+date: "2026-11-05"
+---
+
+On Oracle's free tier, the expensive mistake isn't a bill. It's losing a VM you can't get back.
+
+This is from my personal OCI Kubernetes GitOps project. The long-lived node is meant to be one Always Free Ampere A1 VM. Before I'd even created it, I'd found a way to lose it.
+
+---
+
+## The Rule
+
+The Always Free limit for Ampere A1 is 2 OCPUs and 12 GB of memory in total. As I read Oracle's [Free Tier documentation](https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier.htm) on 2026-11-04: if you hold more A1 than that when your trial ends, all of your A1 instances are disabled. Not just the extra ones. They're then deleted after 30 days, unless you upgrade to a paid account.
+
+The docs don't say when those 30 days start: at trial end, or when the over-limit usage is detected. So I assumed the worst case and didn't plan on any grace period. (I read that page through a tool that summarises it, so check the exact wording on the page itself before relying on my paraphrase.)
+
+This matters because A1 capacity is scarce. At the time of writing I'd been getting "out of host capacity" for over a week. A deleted VM might not come back. I wrote about that wait in [My Free-Tier VM Was "Out of Host Capacity" for a Week](/blog/2026-10-30-a1-capacity-watcher).
+
+---
+
+## Two Things Made a Slip Easy
+
+**My memory was wrong.** I first remembered the limit as 4 OCPUs and 24 GB. The documentation says 2 and 12. If I'd sized a node from memory, I'd have gone over.
+
+**The cost estimator hides it.** OCI's cost estimator showed A1 worker nodes in a managed Kubernetes cluster at $0. That's true for the bill. It hides the fact that those nodes count against the same A1 limit.
+
+Neither of those would have shown up as a charge. That's why a bill alert wouldn't have helped.
+
+---
+
+## Making the Mistake Fail Early
+
+So I stopped relying on memory. I made the mistake fail at `terraform plan`, long before anything is created.
+
+**The managed cluster uses x86 nodes only.** A validation rejects any A1 shape:
+
+```hcl
+validation {
+  condition     = !can(regex("A1", var.node_shape))
+  error_message = "A1 shapes are not allowed for OKE nodes (ADR 0015)."
+}
+```
+
+Running `terraform plan -var node_shape=VM.Standard.A1.Flex` fails with exactly that message.
+
+**The free node's Terraform rejects anything above the limit,** also at plan time:
+
+```hcl
+validation {
+  condition     = var.node_ocpus >= 1 && var.node_ocpus <= 2
+  error_message = "node_ocpus must be 1-2: the Always Free A1 allowance is 2 OCPU in total (ADR 0001)."
+}
+```
+
+The memory variable is bounded the same way, 1 to 12 GB. The defaults are exactly the limit. I checked that `node_ocpus=3` and `node_memory_gbs=13` each fail the plan.
+
+The boot volume has a bound too, 47 to 100 GB, to leave room in the 200 GB Always Free volume allowance.
+
+Two more rules sit around the node. It runs at the free limit from day one (2 OCPU / 12 GB), and it has `prevent_destroy`, because losing it is the one outcome I can't undo.
+
+---
+
+## What I'd Do Differently
+
+I'd write the limit down with its source the first time. My architecture decision record stated the rule with no link, and my memory of the numbers was wrong. Now it cites the Oracle page and records the part the docs leave open.
+
+---
+
+## Still Unsure
+
+The docs don't say when the 30 days start. And my checks only cover Terraform. They can't stop me clicking an A1 VM into existence in the console.
+
+**Update, 2026-11-11:** I've since added a hard cap that OCI itself enforces, a quota policy. It also covers things created outside Terraform. That's the story in [3 Weeks on the Free Tier, No Server. One Minute After Upgrading, I Had One.](/blog/2026-11-11-payg-quota-guardrails)
+
+---
+
+If a mistake can cost you an instance, make it fail at plan time, not at trial end.
+
+The decision is written up in [ADR 0001](https://github.com/Sandeep-RN/oci-k8s-gitops-demo/blob/main/docs/adr/0001-single-node-k3s-on-always-free-a1.md), including the source link and the open question about the 30 days.
+
+*Originally posted on LinkedIn: [On Oracle's free tier, the expensive mistake isn't a bill. It's losing a VM you can't get back.](https://lnkd.in/p/dTaJhFc5)*
