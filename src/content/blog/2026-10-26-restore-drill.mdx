@@ -1,0 +1,87 @@
+---
+title: "My Restore Drill Passed Before I'd Restored Anything"
+description: "I deleted a Sealed Secrets key to test my backup. The old controller pod quietly recreated the Secret, and the drill looked like it passed."
+tags: ["Kubernetes", "Disaster Recovery", "GitOps", "DevSecOps"]
+date: "2026-10-26"
+---
+
+My restore drill passed before I'd restored anything.
+
+This was on my personal OCI Kubernetes GitOps project. The drill was meant to prove a backup. For a few minutes it proved nothing, and it looked fine while doing it.
+
+---
+
+## What Needs Backing Up
+
+Secrets in this project live in Git as Sealed Secrets: ciphertext that only the cluster can decrypt. That means the real secret isn't in Git. It's the controller's private sealing key. Lose it, and every encrypted secret in the repo is unreadable.
+
+There's a second catch. By default the controller adds a new sealing key every 30 days and keeps the old ones, so existing Sealed Secrets still decrypt. It doesn't re-encrypt them. So a one-time backup quietly goes stale: it can't decrypt anything sealed after the next renewal. The runbook has a line for this: back up again after each renewal.
+
+I checked the 30-day default against the controller source (v0.40.0) and its docs. Newer releases exist that I didn't check.
+
+---
+
+## The Drill
+
+I ran it on the OKE cluster on 2026-10-24, with controller v0.40.0.
+
+1. Hash the decrypted Secret (`postgres-credentials`). That's a sha256 of its data, a fingerprint. The values are never printed.
+2. Delete the sealing key and the decrypted Secret, then restart the controller.
+3. Check that decryption now fails.
+
+The Sealed Secret did report `Synced=False` with "no key could decrypt secret". But the Secret was still there. It looked like decryption still worked without the key.
+
+---
+
+## What Actually Happened
+
+Timestamps explained it. The old controller pod had recreated the Secret at 08:12:01. The new pod only started at 08:12:29. The old pod still had the key in memory, and in the seconds before it stopped, it put the Secret back.
+
+I deleted the Secret again. This time it stayed gone.
+
+The runbook now says it in one line: restart the controller first, wait until it's Ready, then check or delete.
+
+---
+
+## The Restore
+
+Then the real part. Apply the backup, delete the key the new controller generated, restart:
+
+```bash
+kubectl apply -f sealed-secrets-keys-<cluster>-<date>.yaml
+kubectl -n kube-system delete secret <generated-key-name>
+kubectl -n kube-system delete pod -l name=sealed-secrets-controller
+kubectl -n kube-system wait --for=condition=Ready pod -l name=sealed-secrets-controller --timeout=180s
+```
+
+The Secret came back, and its fingerprint matched the one from step 1. That's the proof: the same data, recovered from the backup, not just "a Secret exists".
+
+---
+
+## A Second Gotcha: Restart by Deleting the Pod
+
+My first drill restarted the controller with `kubectl rollout restart`. The controller is managed by ArgoCD, and that command writes a `kubectl.kubernetes.io/restartedAt` annotation into the Deployment. That's drift. ArgoCD's self-heal didn't remove it, because its apply only prunes fields it set itself, so the app stayed `OutOfSync`.
+
+I removed the annotation by hand. Then I checked that restarting by deleting the pod changes no spec and keeps the app `Synced`. The runbook says to delete the pod.
+
+---
+
+## Something I Learned Later
+
+When I restored the same keys onto the k3s cluster on 2026-11-12, I found my backup was 14 KB and my password manager refused it. `kubectl apply` had added a `last-applied-configuration` annotation holding the private key a second time, plus `resourceVersion` and `uid`.
+
+Exporting only the fields a restore needs gave 6.8 KB for one key, and it restored cleanly on another cluster (server-side dry run and apply both passed). The runbook has that export now. Each key adds about 6.8 KB, so one note holds one key.
+
+---
+
+## Still Unsure
+
+How often to rehearse this drill so it's still trustworthy. Once proved isn't the same as still true after the next renewal.
+
+---
+
+A backup you've never restored is a hope. And a drill can lie if you check too early.
+
+The full runbook, with every command as I ran it: [Sealed Secrets keys: backup, restore, sealing](https://github.com/Sandeep-RN/oci-k8s-gitops-demo/blob/main/docs/runbooks/sealed-secrets.md).
+
+*Originally posted on LinkedIn: [My restore drill passed before I'd restored anything](https://lnkd.in/p/db9Gukbu).*
