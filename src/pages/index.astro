@@ -73,7 +73,9 @@ const latestPosts = posts
           configuring 1000+ Linux servers, shipping containerised and Java/Apache releases through
           stage gates with rollback plans, and automating the manual work out of operations.
           Outside work I build the full delivery path with
-          <span class="text-[#e6edf3]">Terraform, EKS, GitHub Actions, ArgoCD, OpenTelemetry, Prometheus and Grafana</span>.
+          <span class="text-[#e6edf3]">Terraform, EKS and k3s, GitHub Actions, ArgoCD, OpenTelemetry, Prometheus and Grafana</span>,
+          including a live GitOps demo on a free Oracle Cloud VM with an SLO and burn-rate alerts
+          (<a href="/projects/oci-k8s-gitops" class="text-[#00ff88] hover:underline">write-up</a>).
         </p>
         <div>
           <p class="mb-2">The results are measurable:</p>
@@ -142,13 +144,13 @@ const latestPosts = posts
     <h2 class="text-3xl font-bold mb-10">Technical Stack</h2>
     <div class="grid md:grid-cols-2 gap-6">
       {[
-        { category: 'Cloud', items: ['AWS (EKS, EC2, S3, IAM, VPC, ALB, ECR, Route53, CloudWatch)', 'Azure (AZ-104, AZ-400)', 'OCI (Compute, Networking, DR)'] },
-        { category: 'IaC & Config Mgmt', items: ['Terraform', 'Ansible', 'Python (Zabbix API, OCI SDK)', 'Bash'] },
-        { category: 'Containers & Orchestration', items: ['Kubernetes', 'Docker', 'Docker Compose', 'Amazon EKS', 'ArgoCD'] },
-        { category: 'Observability & SRE', items: ['Zabbix (SLI/SLO, v4→v7)', 'Prometheus', 'Grafana', 'OpenTelemetry', 'Azure Monitor', 'Centreon', 'JMX APM'] },
-        { category: 'CI/CD & GitOps', items: ['GitHub Actions', 'Azure DevOps Pipelines', 'ArgoCD'] },
-        { category: 'SRE Practices', items: ['SLI/SLO', 'Incident Management', 'RCA authoring', 'On-call', 'Runbooks', 'Change Management'] },
-        { category: 'OS & Networking', items: ['Linux (RHEL, CentOS, Ubuntu)', 'VPC', 'DNS', 'Load Balancing', 'VPN', 'Firewalls', 'NAT'] },
+        { category: 'Cloud', items: ['AWS (EKS, EC2, S3, IAM, VPC, ALB, ECR, Route53, CloudWatch)', 'Azure (AZ-104, AZ-400)', 'OCI (Compute, Networking, DR, Object Storage, quota policies)'] },
+        { category: 'IaC & Config Mgmt', items: ['Terraform', 'Ansible', 'Python (Zabbix API, OCI SDK)', 'Bash', 'cloud-init'] },
+        { category: 'Containers & Orchestration', items: ['Kubernetes', 'k3s', 'Docker', 'Docker Compose', 'Amazon EKS', 'OKE', 'Helm', 'Kustomize', 'ArgoCD'] },
+        { category: 'Observability & SRE', items: ['Zabbix (SLI/SLO, v4→v7)', 'Prometheus', 'Alertmanager', 'Grafana', 'OpenTelemetry', 'Burn-rate alerts', 'Azure Monitor', 'Centreon', 'JMX APM'] },
+        { category: 'CI/CD & GitOps', items: ['GitHub Actions', 'Azure DevOps Pipelines', 'ArgoCD', 'Sealed Secrets', 'Trivy'] },
+        { category: 'SRE Practices', items: ['SLI/SLO', 'Incident Management', 'RCA authoring', 'On-call', 'Runbooks', 'ADRs', 'Backup & restore drills', 'Change Management'] },
+        { category: 'OS & Networking', items: ['Linux (RHEL, CentOS, Ubuntu)', 'VPC', 'DNS', 'Load Balancing', 'Traefik', 'cert-manager', 'VPN', 'Firewalls', 'NAT'] },
         { category: 'AI Tools', items: ['Claude', 'GitHub Copilot', 'Cursor'] },
       ].map((group) => (
         <div class="border border-[#30363d] rounded-lg p-5 bg-[#161b22]">
@@ -173,6 +175,13 @@ const latestPosts = posts
     <div class="grid md:grid-cols-2 gap-6">
       {[
         {
+          title: 'Kubernetes GitOps Platform on OCI Free Tier',
+          tags: ['Kubernetes', 'ArgoCD', 'GitOps', 'Terraform', 'Prometheus', 'SLI/SLO', 'GitHub Actions', 'OCI'],
+          desc: 'A production-shaped service on one free VM: ArgoCD GitOps delivery in about 7 minutes from merge to live, a 7-day SLO with burn-rate alerts proven by a planned outage, tested backups, and a live move between clusters with 25 seconds without a DNS record.',
+          slug: 'oci-k8s-gitops',
+          done: false,
+        },
+        {
           title: 'OCI Cloud Cost Automation',
           tags: ['Python', 'OCI', 'Cloud Cost', 'Multi-tenant'],
           desc: 'Automated weekly detection and cleanup of unattached OCI volumes across 20+ compartments — identified $4,536/year in cloud waste and replaced hours of manual hunting across 8 regions.',
@@ -191,13 +200,6 @@ const latestPosts = posts
           tags: ['Terraform', 'EKS', 'GitHub Actions', 'ArgoCD'],
           desc: '10+ service app on a 3-AZ EKS cluster built with Terraform — GitHub Actions CI, ArgoCD GitOps, ALB Ingress, and OpenTelemetry + Prometheus + Grafana observability.',
           slug: 'eks-terraform',
-          done: true,
-        },
-        {
-          title: 'Docker Multi-Service App → ECR',
-          tags: ['Docker', 'AWS ECR', 'Containerization'],
-          desc: 'Multi-service application containerized with Docker and pushed to Amazon ECR with proper image tagging and lifecycle policies.',
-          slug: 'docker-ecr',
           done: true,
         },
       ].map((project) => (

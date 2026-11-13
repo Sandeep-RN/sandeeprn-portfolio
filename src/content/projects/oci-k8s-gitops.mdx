@@ -1,0 +1,150 @@
+---
+title: "Kubernetes GitOps Platform on OCI Free Tier"
+description: "A production-shaped service on one free VM: ArgoCD GitOps delivery in about 7 minutes from merge to live, a 7-day SLO with burn-rate alerts proven by a planned outage, tested backups, and a live move between clusters with 25 seconds without a DNS record."
+tags: ["Kubernetes", "ArgoCD", "GitOps", "Terraform", "Prometheus", "SLI/SLO", "GitHub Actions", "OCI"]
+status: "in-progress"
+date: "2026-11"
+github: "https://github.com/Sandeep-RN/oci-k8s-gitops-demo"
+---
+
+## Overview
+
+A **personal project**, not work done for an employer. I wanted to run Kubernetes the way a production service should be run, at a cost of zero. The service is a small link shortener, live at [demo.sandeeprn.in](https://demo.sandeeprn.in) on a single-node k3s cluster on one Always Free Oracle Cloud VM (Ampere A1, 2 OCPU, 12 GB, arm64) since 2026-11-12.
+
+Every change is delivered through Git: CI builds and scans the image, a pull request changes the tag, ArgoCD deploys it. The service has HTTPS, a 7-day availability SLO with burn-rate alerts, nightly backups with tested restores, and 22 recorded architecture decisions.
+
+Stack: **Terraform → k3s → GitHub Actions → ArgoCD → Prometheus + Alertmanager + Grafana**
+
+Three public repos: [infrastructure and docs](https://github.com/Sandeep-RN/oci-k8s-gitops-demo), [application and CI](https://github.com/Sandeep-RN/oci-k8s-gitops-demo-app), [Kubernetes manifests](https://github.com/Sandeep-RN/oci-k8s-gitops-demo-gitops).
+
+## Architecture
+
+```
+  Developer --merge--> GitHub Actions --image--> GHCR
+                       (test, build, scan)
+
+                               |
+                               | tag-bump pull request
+                               v
+                          gitops repo
+                               ^
+                               | pulls, then applies
+  +----------------------------|-------------------------------+
+  | One free VM (Ampere A1, 2 OCPU / 12 GB) running k3s        |
+  |                            |                               |
+  |   ArgoCD ------------------+                               |
+  |                                                            |
+  |   Traefik ------> link shortener x2 ------> PostgreSQL     |
+  |   (TLS, HSTS,                                    |         |
+  |    rate limit)                                   |         |
+  |                                                  |         |
+  |   Prometheus + Alertmanager                      |         |
+  +------^---------------|---------------------------|---------+
+         |               v                           v
+      Visitor         Discord                 Object Storage
+      (HTTPS)       (SLO alerts)             (nightly backups)
+```
+
+## Tools, by layer
+
+| Layer | Tools |
+|---|---|
+| Infrastructure as code | Terraform (OCI provider, remote state in Object Storage), cloud-init, Bash |
+| Kubernetes | k3s, OKE, Kustomize (base and overlays), Helm |
+| GitOps | ArgoCD (app of apps, automated sync with prune and self-heal), Sealed Secrets |
+| CI/CD | GitHub Actions, Docker (multi-arch: amd64 and arm64), GHCR, Trivy, gitleaks, pre-commit |
+| Edge | Traefik, cert-manager, Let's Encrypt (DNS-01), external-dns, Cloudflare DNS |
+| Observability | Prometheus, Alertmanager, Grafana, kube-prometheus-stack, blackbox exporter, SLOs, multi-window burn-rate alerts, promtool tests |
+| Data | PostgreSQL (StatefulSet), `pg_dump` backups to Object Storage, restore drills |
+| Application | Python, FastAPI, pytest |
+| Practice | ADRs, runbooks, pull requests only, issue-first tracking, cost guardrails (OCI quota policy and budget) |
+
+## Results
+
+Every row has a source in the repo.
+
+| What was tested | Result | Source |
+|---|---|---|
+| A change, from merge to running in the cluster | About 7 minutes, no manual step | [evidence](https://github.com/Sandeep-RN/oci-k8s-gitops-demo/blob/main/docs/evidence/oke-final-2026-11-10.md) |
+| Rollout under live traffic | 514 requests, 0 failed | same |
+| Node drain under live traffic (two nodes) | 1264 requests, 0 failed. The disruption budget refused the drain that would have taken the last pod | same |
+| SLO alert on a real outage | A planned 5-minute database outage fired the critical alert to Discord 7.5 minutes after it began; it then resolved | [#53](https://github.com/Sandeep-RN/oci-k8s-gitops-demo/issues/53) |
+| A whole cluster from Git | On a new node, 10 ArgoCD Applications were Synced and Healthy 3.5 minutes after the root Application was applied (after the key restore and the ArgoCD install) | [evidence](https://github.com/Sandeep-RN/oci-k8s-gitops-demo/blob/main/docs/evidence/k3s-bootstrap-2026-11-12.md) |
+| Moving the live site to another cluster | The cutover was one pull request. DNS record absent for 25 seconds. All 34 rows restored | same |
+| Backup and restore | Nightly dumps. Restored twice: a drill on 2026-10-25, and for real in the move on 2026-11-12 | [runbook](https://github.com/Sandeep-RN/oci-k8s-gitops-demo/blob/main/docs/runbooks/postgres-backup-restore.md) |
+| Image scan gate | Blocked a real HIGH CVE before the image was pushed | [evidence](https://github.com/Sandeep-RN/oci-k8s-gitops-demo/blob/main/docs/evidence/oke-final-2026-11-10.md) |
+| Rate limit per client | One client's burst of 600 requests got 282 answers of 429. That Traefik sees each client's own address was measured with a packet capture. Not run: the check that a second client still gets 200 during the burst | [#115](https://github.com/Sandeep-RN/oci-k8s-gitops-demo/issues/115), [ADR 0022](https://github.com/Sandeep-RN/oci-k8s-gitops-demo/blob/main/docs/adr/0022-moving-the-demo-from-oke-to-k3s.md) |
+| Spend cap | A launch outside the allowed shapes was refused by the quota policy | [ADR 0021](https://github.com/Sandeep-RN/oci-k8s-gitops-demo/blob/main/docs/adr/0021-pay-as-you-go-with-guardrails.md), [#113](https://github.com/Sandeep-RN/oci-k8s-gitops-demo/issues/113) |
+
+How to read these numbers:
+
+- The drain, rollout and alert tests ran on the **two-node OKE target**, not on the single k3s node.
+- The traffic in those tests was **under one request a second**. They show that planned disruptions lose no requests. They are not load tests.
+- The SLO is 99.5% of redirects over 7 days. It is a target with alerts, **not** a measured uptime figure.
+- **25 seconds** is how long the DNS record was absent. It is not a downtime figure: a resolver could keep the old address for up to 5 minutes, and what users saw was not measured. Before the one pull request came a key restore, two manual applies and a data restore (about 35 minutes).
+- In the alert test the page arrived **after** the 5-minute outage had ended. It was paged 7.5 minutes after the outage began, not detected in real time.
+- "Paged" means a message in a Discord channel. There is no pager and no on-call rota.
+
+## How it went
+
+1. **No capacity.** From 2026-10-22 the free ARM VM could not be created: the region had no capacity. Rather than wait, I built the whole stack on a two-node managed cluster (OKE) paid from trial credit, with a teardown date set on day one ([ADR 0015](https://github.com/Sandeep-RN/oci-k8s-gitops-demo/blob/main/docs/adr/0015-oke-ephemeral-second-target.md)).
+2. **Reliability, proven on OKE.** The pipeline end to end, an SLO whose alert was fired by a planned outage, backups with a restore drill, and a node drain and a rollout under live traffic with no failed request.
+3. **The cost decision.** Upgrading to Pay As You Go was the one lever left to get free capacity. A budget on OCI only sends an email, up to a day late, so a quota policy went in first as a hard cap and was proven with a launch that had to fail ([ADR 0021](https://github.com/Sandeep-RN/oci-k8s-gitops-demo/blob/main/docs/adr/0021-pay-as-you-go-with-guardrails.md)). The free VM was created in the same minute as the upgrade, on 2026-11-11.
+4. **The move.** k3s on one node has no load balancer. A packet capture showed how to keep real client IPs without one, which also made the rate limit per client ([ADR 0022](https://github.com/Sandeep-RN/oci-k8s-gitops-demo/blob/main/docs/adr/0022-moving-the-demo-from-oke-to-k3s.md)). On 2026-11-12 the cluster was built from Git, the data restored, and the live hostname moved by one pull request.
+
+## Decisions and why
+
+| Decision | Why |
+|---|---|
+| CI opens a pull request that changes the image tag; ArgoCD pulls it ([ADR 0009](https://github.com/Sandeep-RN/oci-k8s-gitops-demo/blob/main/docs/adr/0009-ci-commits-image-tag-to-gitops-repo.md)) | No cluster credential exists outside the cluster, and Git is the audit log |
+| Readiness checks only the pod itself ([ADR 0016](https://github.com/Sandeep-RN/oci-k8s-gitops-demo/blob/main/docs/adr/0016-readiness-checks-pod-local-state-only.md)) | A database check in readiness removed every pod at once and hid the errors from the SLO |
+| An SLO with multi-window burn-rate alerts ([ADR 0008](https://github.com/Sandeep-RN/oci-k8s-gitops-demo/blob/main/docs/adr/0008-observability-and-slo.md)) | Page on budget burn, not on every blip |
+| A synthetic probe inside the cluster ([ADR 0019](https://github.com/Sandeep-RN/oci-k8s-gitops-demo/blob/main/docs/adr/0019-in-cluster-synthetic-redirect-probe.md)) | GitHub ran the outside probe every few hours, not every few minutes |
+| Backups with a write-only identity ([ADR 0017](https://github.com/Sandeep-RN/oci-k8s-gitops-demo/blob/main/docs/adr/0017-backup-auth-instance-principals-write-only.md)) | A compromised pod cannot read or delete backups |
+| The app uses its own database role, not the superuser ([ADR 0018](https://github.com/Sandeep-RN/oci-k8s-gitops-demo/blob/main/docs/adr/0018-app-database-role-least-privilege.md)) | Least privilege |
+| Secrets in Git as Sealed Secrets ([ADR 0006](https://github.com/Sandeep-RN/oci-k8s-gitops-demo/blob/main/docs/adr/0006-sealed-secrets.md)) | The repos are public; the key is backed up offline and its restore was drilled |
+| A quota policy as the cap, a budget as the alarm ([ADR 0021](https://github.com/Sandeep-RN/oci-k8s-gitops-demo/blob/main/docs/adr/0021-pay-as-you-go-with-guardrails.md)) | A budget cannot stop spend |
+| No load balancer on k3s ([ADR 0022](https://github.com/Sandeep-RN/oci-k8s-gitops-demo/blob/main/docs/adr/0022-moving-the-demo-from-oke-to-k3s.md)) | Real client IPs and no cost; the price is no redundancy at the edge |
+| One node on the free tier ([ADR 0001](https://github.com/Sandeep-RN/oci-k8s-gitops-demo/blob/main/docs/adr/0001-single-node-k3s-on-always-free-a1.md)) | $0 a month; high availability is given up, and said so |
+
+All 22 are in the [ADR index](https://github.com/Sandeep-RN/oci-k8s-gitops-demo/blob/main/docs/adr/README.md).
+
+## Problems found and fixed
+
+Each one happened; the linked issue has the detail.
+
+| Problem | Cause | Fix |
+|---|---|---|
+| The SLO missed errors during a database outage ([#61](https://github.com/Sandeep-RN/oci-k8s-gitops-demo/issues/61)) | Readiness checked the shared database, so every pod left the Service and requests were refused, not counted | Readiness checks only the pod; the app answers a fast 503 that the SLO counts |
+| The paging alert did not fire in the first live test ([#53](https://github.com/Sandeep-RN/oci-k8s-gitops-demo/issues/53)) | Three 15-second outages are about 2.5% of the hour: below the paging threshold, correctly | A sustained 5-minute outage was designed; the alert fired and resolved |
+| "Must spread across nodes" left both pods on one node ([#76](https://github.com/Sandeep-RN/oci-k8s-gitops-demo/issues/76)) | The spread rule counted pods of the old and new version together during a rollout | Spread per ReplicaSet (`matchLabelKeys`); checked over three rollouts |
+| Public DNS got a private address ([#99](https://github.com/Sandeep-RN/oci-k8s-gitops-demo/issues/99)) | The load balancer reported its private IP too, and external-dns published it | Private ranges are excluded |
+| The rate limit never fired ([#106](https://github.com/Sandeep-RN/oci-k8s-gitops-demo/issues/106)) | The load balancer hid client IPs, so all clients shared a few buckets | On k3s, `externalTrafficPolicy: Local` keeps client IPs, measured with a packet capture |
+| The scan gate failed a one-line change ([#117](https://github.com/Sandeep-RN/oci-k8s-gitops-demo/issues/117)) | Two fixable HIGH CVEs had appeared in the base image | Upgrade that package in the Dockerfile; the gate did its job |
+| The cutover was blocked by my own CI rule ([#133](https://github.com/Sandeep-RN/oci-k8s-gitops-demo/issues/133)) | CI required an Ingress in every overlay; the cutover had to delete one | The same pull request reversed the rule for the old cluster |
+
+## Not done
+
+Said plainly, because the limits are part of the project:
+
+- **High availability.** One node. A reboot or an upgrade is an outage.
+- **A rebuild of the k3s cluster.** The runbook section is written, not run ([#57](https://github.com/Sandeep-RN/oci-k8s-gitops-demo/issues/57)).
+- **OKE teardown.** The two-node cluster still exists with no public way in; teardown is [#13](https://github.com/Sandeep-RN/oci-k8s-gitops-demo/issues/13).
+- **Load or performance testing.** None. The tests ran at under one request a second.
+- **Autoscaling, NetworkPolicies, a log stack, a dead man's switch** for the monitoring stack.
+- **Terraform in CI.** `terraform apply` is run by hand from a laptop.
+- **A measured uptime figure** or a measured recovery time.
+- **Database replication.** One replica; up to 24 hours of data can be lost.
+
+The full list, with what would come next, is in the [roadmap](https://github.com/Sandeep-RN/oci-k8s-gitops-demo/blob/main/docs/roadmap.md).
+
+## How it was built
+
+Between 2026-10-20 and 2026-11-13, with an AI coding assistant (Claude Code). The assistant wrote much of the YAML, Terraform and scripts, and first drafts of the docs. I made the decisions, applied the infrastructure, ran or supervised every live test, and reviewed and merged the pull requests. A second model reviewed the first ADRs and found real errors. The skill on show is deciding, verifying and operating, not typing YAML.
+
+## Links
+
+- Live site: [demo.sandeeprn.in](https://demo.sandeeprn.in)
+- Start here: the [README](https://github.com/Sandeep-RN/oci-k8s-gitops-demo/blob/main/README.md), then [architecture](https://github.com/Sandeep-RN/oci-k8s-gitops-demo/blob/main/docs/architecture.md)
+- Videos: [node drain, 2:00](https://youtu.be/ypoLkJUmsCI), [rollout under traffic, 1:45](https://youtu.be/_CFu4mpSBlg)
+- Write-ups of the problems, as issues: [label `post-idea`](https://github.com/Sandeep-RN/oci-k8s-gitops-demo/issues?q=label%3Apost-idea)
