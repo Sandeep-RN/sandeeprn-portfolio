@@ -1,0 +1,100 @@
+---
+title: "My Free-Tier VM Was 'Out of Host Capacity' for a Week. So I Stopped Clicking."
+description: "A script polls OCI's free, read-only capacity report and runs Terraform only when it is safe to. The safety catches took the most thought."
+tags: ["OCI", "Terraform", "Automation", "DevOps"]
+date: "2026-10-30"
+---
+
+My free-tier VM has been "out of host capacity" for a week. So I stopped clicking.
+
+This is from my personal OCI Kubernetes GitOps project. The plan is for the whole cluster to run on one Always Free Ampere A1 VM. Creating that VM fails with `500-InternalError, Out of host capacity`.
+
+---
+
+## Why Retrying by Hand Doesn't Work
+
+My home region has a single availability domain, so "try another AD" isn't an option. A1 capacity shows up in short windows, and I'd have to be clicking at the right moment.
+
+I spent two days retrying in the console. Then I wrote a watcher script instead.
+
+---
+
+## What the Script Does
+
+Every 2 minutes it asks OCI's compute capacity report whether A1 is available. The report is read-only and free. It launches nothing.
+
+```
++----------------------------------------+
+| every ~2 min, give up after 48 h       |
++----------------------------------------+
+                  |
+                  v
++----------------------------------------+
+| capacity report for A1 (read-only)     |
++----------------------------------------+
+                  |
+                  v
++----------------------------------------+
+| AVAILABLE, or every 15th loop?         |
++----------------------------------------+
+                  |
+                  v
++----------------------------------------+
+| plan must be 0 to change, 0 to destroy |
++----------------------------------------+
+                  |
+                  v
++----------------------------------------+
+| terraform apply                        |
+| out of capacity: wait and retry        |
+| any other error: stop                  |
++----------------------------------------+
+```
+
+When the report says `AVAILABLE`, the script runs Terraform to create the node. The interval has a little random jitter so it doesn't hit the API on a fixed beat.
+
+---
+
+## The Safety Catches
+
+Writing the loop was easy. Deciding when it must stop took the most thought, because the script applies Terraform with nobody watching.
+
+- **It applies only if the plan is purely additive:** 0 to change, 0 to destroy. If the plan touches anything that exists, it stops and tells me to run the plan myself.
+- **It retries only on "out of capacity".** Any other error stops the script. A permissions error or a bad variable shouldn't be retried for 48 hours.
+- **Every 15th loop it tries anyway,** even if the report says no, in case the report is wrong.
+- **It masks OCIDs and IPs in its output,** so a pasted terminal is safe to put in a public issue.
+- **It asks once at the start.** It shows the plan and waits for me to type `yes`, because it will apply that plan later without asking again.
+
+It also scopes itself. It applies only the k3s root, which has its own state key, and never the OKE one. And the Terraform variables refuse a node bigger than the Always Free allowance (2 OCPU / 12 GB), so a typo fails at plan time. I wrote about why that limit matters in [On Oracle's Free Tier, the Expensive Mistake Isn't a Bill](/blog/2026-11-05-free-tier-a1-rule).
+
+An unattended apply is only as safe as the conditions that stop it.
+
+---
+
+## Two Details the Capacity Report Needs
+
+The report call takes the availability domain name and the root compartment (the tenancy). The script looks both up itself.
+
+OCI session tokens last about an hour, so the script refreshes its session every 25 minutes and checks auth on every loop. If the session has expired, it stops and says so.
+
+---
+
+## What I Tested, and What I Didn't
+
+When I opened the PR, I had checked that the guardrail variables fail at `terraform plan` (`node_ocpus=3`, `node_memory_gbs=13`, and an SSH CIDR of `0.0.0.0/0` each fail with an error naming the ADR). I'd also run the capacity report call for real, and it returned `OUT_OF_HOST_CAPACITY`, so the query path was right.
+
+I had not tested the apply loop or the cloud-init that installs k3s. Both need a node to exist. I wrote that in the PR as "not tested", not as a footnote.
+
+---
+
+## Still Unsure
+
+When I posted this, capacity hadn't appeared yet, so the part of the script that actually applies Terraform had never run for real.
+
+**Update, 2026-11-11:** it has now. Attempt 112 reported `AVAILABLE`, the plan was 1 to add, and the node was created 45 seconds later at 2 OCPU / 12 GB. The story of what changed just before that is in [3 Weeks on the Free Tier, No Server. One Minute After Upgrading, I Had One.](/blog/2026-11-11-payg-quota-guardrails)
+
+---
+
+The script is in the repo: [`scripts/a1-wait-and-apply.sh`](https://github.com/Sandeep-RN/oci-k8s-gitops-demo/blob/main/scripts/a1-wait-and-apply.sh).
+
+*Originally posted on LinkedIn: [My free-tier VM has been "out of host capacity" for a week. So I stopped clicking.](https://lnkd.in/p/dK53MX9P)*
