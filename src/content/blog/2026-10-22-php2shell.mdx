@@ -1,0 +1,56 @@
+---
+title: "php2shell Is Everywhere Today. 'Patch Now' Skips the Two Hard Parts."
+description: "The PHP RCE alert says update. From an SRE seat, the hard parts are knowing where PHP runs and proving the fix is actually live."
+tags: ["SRE", "DevOps", "DevSecOps"]
+date: "2026-10-22"
+---
+
+php2shell is everywhere today. Most posts say "patch now."
+
+From an SRE seat, "patch now" skips the two hard parts.
+
+This one is news commentary, not project work. I'm writing it because the advice I saw was correct and still incomplete.
+
+---
+
+## The Facts
+
+The UK's NCSC issued an alert on 21 October 2026 about two PHP flaws: CVE-2026-109618 and CVE-2026-109619. They allow unauthenticated remote code execution in PHP itself, with a CVSS score of 9.2. They're fixed in PHP 8.5.12, 8.4.27, 8.3.36 and 8.2.35. Exploitation attempts were already being reported when I wrote this.
+
+I took these details from the NCSC alert and PHP's security advisories. Versions and mitigations can change, so check the current advisory before you act on mine.
+
+---
+
+## Hard Part 1: Knowing Where PHP Runs
+
+The NCSC's first action isn't "update". It's to identify the systems running PHP, starting with the internet-facing ones. That's harder than it sounds, because PHP hides in three places:
+
+- **Hosts.** Build the list from package inventory, not from memory. Something like `rpm -qa | grep -i php` on RHEL-family hosts and `dpkg -l | grep -i php` on Debian and Ubuntu, run across the whole estate by your config management.
+- **Container base images.** Images you didn't know shipped PHP. A base image can carry PHP even if your service is written in something else.
+- **Vendor products and appliances.** Some bundle PHP and never show up in your package manager. You find these by asking the vendor, not by scanning.
+
+---
+
+## Hard Part 2: Proving the Fix Is Live
+
+"We upgraded" and "the fix is serving traffic" are different statements.
+
+- **Backported fixes hide behind old version numbers.** RHEL, Ubuntu and Debian often backport a fix without bumping the upstream version. A version-string check can flag a patched host as vulnerable. Check against your distro's advisory instead.
+- **`php -v` shows the CLI.** What serves traffic is `php-fpm` or `mod_php`, and on a host with several PHP versions it can be a different PHP entirely.
+- **An upgrade doesn't restart everything.** Long-running workers keep old code in memory. Containers stay vulnerable until the image is rebuilt and redeployed. `needs-restarting` on RHEL, or `needrestart` on Debian and Ubuntu, shows which processes are still running old libraries.
+
+---
+
+## What I'd Pass On
+
+I've managed 1000+ Linux servers with Ansible and Zabbix. The lesson I'd pass on: the patch is rarely the slow part. Finding every instance, and proving the fix is live, is.
+
+Here's a quick test for your team. Can you answer "where is PHP running, and which version is actually serving traffic?" in 10 minutes?
+
+If the answer is "let me check", that's the work to do before the next alert, not during it.
+
+---
+
+Sources: the [NCSC alert](https://www.ncsc.gov.uk/news/critical-security-issue-affecting-php) and the [PHP security advisories](https://lnkd.in/d3j6iYtu) (fixed versions and mitigations).
+
+*Originally posted on LinkedIn: [php2shell is everywhere today. Most posts say "patch now."](https://www.linkedin.com/posts/sandeep-rn_sre-devops-cybersecurity-share-7518918863720177665-AbWa)*
