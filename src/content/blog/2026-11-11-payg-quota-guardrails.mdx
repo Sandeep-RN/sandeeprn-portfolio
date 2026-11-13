@@ -1,0 +1,120 @@
+---
+title: "3 Weeks on the Free Tier, No Server. One Minute After Upgrading, I Had One."
+description: "I upgraded to Pay As You Go only after a quota policy was in place and proven to block. A budget is an alarm. A quota is a cap."
+tags: ["OCI", "Terraform", "Cloud Cost", "DevOps"]
+date: "2026-11-11"
+---
+
+3 weeks on the free tier, no server. One minute after upgrading, I had one.
+
+This is from my personal OCI Kubernetes GitOps project. The Kubernetes node is meant to be one Always Free ARM VM. Since 22 October, every attempt to create it had failed with "out of host capacity".
+
+---
+
+## The Upgrade I'd Ruled Out
+
+Upgrading to Pay As You Go was the obvious next step, and I'd ruled it out: I wanted the bill at exactly zero. By early November, polling hadn't helped, and upgrading was the one lever left.
+
+What I was really afraid of was an accidental bill. So I decided to upgrade only after I'd put a real cap in place and proved it blocks.
+
+---
+
+## An Alert Is Not a Cap
+
+Oracle's docs call budgets "soft limits". A budget alert is an email, and alerts are evaluated "every 24 hours". It can arrive a day after the spend started.
+
+A quota is different. A request over a quota is refused. (That's what my own test showed. Oracle's quota pages don't spell out what happens to a request over a quota.)
+
+My account's service limits were already far above Always Free: 41 A1 cores, where the free allowance is 2. Until now, the free size was only enforced by a Terraform validation, which protects nothing created in the console or by another root. After an upgrade, a mistake gets billed to the card.
+
+---
+
+## One Quota Policy, in Terraform
+
+I wrote one quota policy at the tenancy root. It's an allow list: zero a whole family, then allow only what I use. Here's a trimmed version:
+
+```hcl
+quota_statements = [
+  "zero compute-core quotas in tenancy",
+  "zero compute-memory quotas in tenancy",
+
+  # The ARM VM at exactly the free size (AD and regional counts)
+  "set compute-core quota standard-a1-core-count to 2 in tenancy",
+  "set compute-core quota standard-a1-core-regional-count to 2 in tenancy",
+  "set compute-memory quota standard-a1-memory-count to 12 in tenancy",
+  "set compute-memory quota standard-a1-memory-regional-count to 12 in tenancy",
+
+  # Disk storage capped at what I already use
+  "set block-storage quota total-storage-gb to 250 in tenancy",
+  "set block-storage quota total-replica-storage-gb to 0 in tenancy",
+  # ...plus the OKE workers' current size, backups, and classic load balancers
+]
+```
+
+Every compute shape at 0, the ARM VM at exactly 2 OCPU / 12 GB, and storage capped at current use. The order matters. I put the family-wide zero first and the allow lines after it, in a single policy, because I understood that a later statement overrides an earlier one inside one policy. I haven't re-checked that rule against Oracle's docs. It's what worked for me: the quota refused what it should, and still let the A1 request through to a capacity answer.
+
+A plan can't check quota statements, so a misspelt name fails only at apply. I took the names from `oci limits definition list` on my own tenancy. And storage is set quota by quota, because a family-wide zero would also zero `volume-count` and block every new disk.
+
+Plus one budget for the whole account, as the alarm. OCI allows one budget per target compartment, so my first apply failed with `400-LimitExceeded`: an older console budget already targeted the root. The quota policy had already been created and stayed in state. I deleted the old budget, and the second apply created the rest.
+
+---
+
+## Proving the Quota Blocks
+
+Before upgrading, I launched a VM the quota must refuse. I picked a free micro VM on purpose, so a failed test would cost nothing. I'd never test by asking for more A1 than the quota: if that went through, it would be billed.
+
+![Terminal output of a failed instance launch: ServiceError code QuotaExceeded, message says the standard-e2-micro-core-count quota was exceeded by 1, status 400. The quota policy OCID, request ID and endpoint are masked.](/blog/2026-11-11-payg-quota-guardrails/post-image-2-quota-refused.png)
+
+Refused: `400 QuotaExceeded`, naming `standard-e2-micro-core-count`. That shape had no capacity either, and the error still named the quota. A capacity error would have proven nothing, so this was a real test.
+
+The A1 watcher's next apply also still failed with "out of host capacity", not a quota error. So the free A1 size was still allowed.
+
+---
+
+## The Budget Was an Alarm, Not a Cap
+
+The budget's first emails arrived the next morning, all three of them. The month's spend was already about 4x the budget, because of the trial credit I'd used for a planned OKE cluster.
+
+So budgets count usage that trial credit paid for. Oracle doesn't document that. The alert told me, which is its job. It can't stop anything.
+
+---
+
+## The Upgrade
+
+Then I upgraded from the free account to Pay As You Go, with a card attached. Oracle says Always Free resources stay free after the upgrade, and only usage above them is billed.
+
+![Terminal output of the A1 watcher on 2026-11-11: attempts 106 to 111 report OUT_OF_HOST_CAPACITY, attempt 112 at 14:13:28 reports AVAILABLE, the plan adds 1 resource, the instance is created after 45 seconds and the script prints SUCCESS at 14:14:32.](/blog/2026-11-11-payg-quota-guardrails/post-image.png)
+
+The upgrade finished at about 14:14 IST. The watcher's attempt 112, at 14:13:28, reported `AVAILABLE`, and the node was created 45 seconds later at 2 OCPU / 12 GB. That's the same minute as the upgrade.
+
+Meanwhile, my limits jumped about 6x:
+
+| | Before upgrade | After |
+|---|---|---|
+| A1 service limit (cores) | 41 | 250 |
+| E5 service limit (cores) | 13 | 83 |
+| A1 effective quota | 2, used 0 | 2, used 2 |
+
+The quota is now the only thing holding the free size. A typo in a shape variable is refused, not billed.
+
+---
+
+## What the Quota Doesn't Cover
+
+Not everything has a quota. Network load balancers, OKE clusters, Object Storage, data transfer and every other service are only watched by the budget, which can be up to a day late.
+
+On the day of the upgrade, the trial credit was still paying and there was no card charge. Two days later, Cost Analysis showed nothing unexpected. The one new line was block storage, about SGD 0.09 a day, for the 50 GB above the 200 GB free allowance while the old cluster's volumes still exist.
+
+---
+
+## Still Unsure
+
+This is one upgrade. Oracle doesn't say that Pay As You Go accounts get capacity first, so the timing could be luck.
+
+---
+
+A budget alert sends an email. A quota refuses the request.
+
+The steps, in the order I ran them: [cost guardrails runbook](https://github.com/Sandeep-RN/oci-k8s-gitops-demo/blob/main/docs/runbooks/cost-guardrails.md). The back story is in [My Free-Tier VM Was "Out of Host Capacity" for a Week](/blog/2026-10-30-a1-capacity-watcher).
+
+*Originally posted on LinkedIn: [3 weeks on the free tier, no server. One minute after upgrading, I had one.](https://lnkd.in/p/dJiRmhG4)*
