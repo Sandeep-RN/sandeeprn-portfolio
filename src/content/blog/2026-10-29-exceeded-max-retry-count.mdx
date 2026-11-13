@@ -1,0 +1,94 @@
+---
+title: "My Cloud Said 'Exceeded Max Retry Count'. It Meant 'We're Out of Machines'."
+description: "An OKE node pool failed with a retry error and deleted itself. OCI's capacity report, which launches nothing, showed the real cause."
+tags: ["OCI", "Terraform", "Kubernetes", "Debugging", "SRE"]
+date: "2026-10-29"
+---
+
+My cloud said "exceeded max retry count". It meant "we're out of machines".
+
+This is from my personal OCI Kubernetes GitOps project. I was creating a short-lived OKE cluster with Terraform. The cluster came up. The node pool didn't.
+
+---
+
+## The Error
+
+Terraform tried to create a 2-node OKE node pool. About 3 minutes later it failed with:
+
+```
+Work request exceeded max retry count
+```
+
+Nothing about capacity. And OKE deleted the failed node pool by itself, so there was nothing left to inspect.
+
+The work-request logs had the real clue, repeated until it gave up:
+
+```
+Validating nodes: 0 provisioned, 0 provisioning, 2 remaining
+```
+
+Not one node had ever started. That isn't a flaky retry. That's missing hardware.
+
+---
+
+## Asking OCI Directly
+
+OCI has a compute capacity report. It's read-only: it tells you whether a shape is available without launching anything. I ran it once per fault domain:
+
+```bash
+oci compute compute-capacity-report create \
+  --compartment-id <tenancy-ocid> \
+  --availability-domain <ad-name> \
+  --shape-availabilities '[{"instanceShape":"VM.Standard.E5.Flex","instanceShapeConfig":{"ocpus":1,"memoryInGBs":8},"faultDomain":"FAULT-DOMAIN-1"}]'
+```
+
+Two details cost me time. The report wants the availability domain name, and the compartment must be the tenancy (the root compartment), not your project compartment.
+
+What it said for my region (one availability domain, three fault domains):
+
+| Shape | Report | Usable? |
+|---|---|---|
+| `E4.Flex` | `OUT_OF_HOST_CAPACITY` in all 3 fault domains | No |
+| `E5.Flex` | available, within my limits | Yes |
+| `E6.Flex` | available, but my service limit was 0 | No |
+
+---
+
+## Two Things Must Be True
+
+A VM only starts if two things are true:
+
+1. The cloud has the hardware.
+2. Your account is allowed to use it.
+
+The capacity report answers the first. Service limits answer the second, with `oci limits value list --service-name compute`. E6 passed the first and failed the second. E4 failed the first.
+
+I switched to `E5.Flex`. The next apply added the node pool, and a follow-up plan showed no changes (`terraform plan -detailed-exitcode` returned 0).
+
+---
+
+## The Follow-On Bug I Made
+
+Switching shapes caused a second problem.
+
+My Terraform PR had been merged 5 minutes after I opened it. I'd pushed three more commits to its branch after that, including the switch to E5, and they never reached `main`. So `main` still said `VM.Standard.E4.Flex` while the live node pool was E5.
+
+`terraform plan` on `main` proposed changing the live node pool back to E4. E4 has no capacity in my region, so any node replacement would have failed.
+
+The fix was a second PR that cherry-picked the three lost commits unchanged. Afterwards, `terraform plan -detailed-exitcode` on that branch returned 0: the code matched the live cluster. Running that plan against `main` is what exposed the bug in the first place.
+
+---
+
+## Still Unsure
+
+The capacity report is a snapshot. About a week later, on 2026-10-29, E4 was still out in all 3 fault domains. I don't know whether that's a short gap or a long one.
+
+The node pool wasn't the only thing that hit this. My free-tier VM did too, which is the story in [My Free-Tier VM Was "Out of Host Capacity" for a Week](/blog/2026-10-30-a1-capacity-watcher). A direct VM launch says "Out of host capacity" plainly. A managed node pool says it with a retry count.
+
+---
+
+A VM only starts if the cloud has the hardware and your account is allowed to use it. Check both before you trust a retry count.
+
+The check is in the repo's troubleshooting notes: [Terraform README](https://github.com/Sandeep-RN/oci-k8s-gitops-demo/blob/main/terraform/README.md).
+
+*Originally posted on LinkedIn: [My cloud said "exceeded max retry count". It meant "we're out of machines".](https://lnkd.in/p/d7_hfe3W)*
