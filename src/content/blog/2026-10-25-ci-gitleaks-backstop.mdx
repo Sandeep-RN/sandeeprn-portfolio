@@ -1,0 +1,100 @@
+---
+title: "I Skipped My Secret Scanner on Purpose. CI Still Failed the PR."
+description: "A pre-commit hook is skipped by one flag. I added a pinned, full-history Gitleaks job to CI in all three repos and proved it blocks."
+tags: ["DevSecOps", "GitOps", "GitHub Actions", "Automation"]
+date: "2026-10-25"
+---
+
+I committed a fake secret on purpose, with `git commit --no-verify`. That skipped my pre-commit hook. CI still failed the PR.
+
+This is from my personal OCI Kubernetes GitOps project, and it's the follow-up to [My Secret Scanner Was Leaking the Secret It Was Supposed to Catch](/blog/2026-10-21-secret-scanner). That post ended with an honest gap: a pre-commit hook is only the first layer, because anyone can skip it. This is the second layer.
+
+---
+
+## The Problem
+
+Secret scanning ran only as a pre-commit hook. `git commit --no-verify` skips it, and nothing in CI caught a leak afterwards. The one check I had could be switched off by a flag.
+
+---
+
+## The Fix: a Gitleaks Job in CI, in All Three Repos
+
+The project has three repos (the infrastructure, the app and the GitOps repo), so each got the same workflow. It runs on every pull request and on every push to `main`. Here it is, trimmed:
+
+```yaml
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+env:
+  GITLEAKS_VERSION: 8.30.1
+  GITLEAKS_SHA256: <sha256 of the release tarball>
+
+steps:
+  - uses: actions/checkout@<pinned commit>
+    with:
+      fetch-depth: 0 # full history
+      persist-credentials: false
+
+  - name: Install gitleaks (checksum verified)
+    run: |
+      curl -fsSL -o gl.tgz "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+      echo "${GITLEAKS_SHA256}  gl.tgz" | sha256sum -c -
+      tar -xzf gl.tgz gitleaks
+
+  - name: Scan history
+    run: ./gitleaks git . --config .gitleaks.toml --redact --verbose --no-banner
+```
+
+Four choices in there are on purpose:
+
+- **Full history, not just the new commits.** A secret that was committed and later deleted is still public. The job keeps failing until it's rotated.
+- **A pinned version with a checksum check.** The job installs one exact Gitleaks release and verifies its sha256 before running it. The checkout action is pinned to a commit too.
+- **`--redact`.** The CI log is public, and I'd already seen what an unredacted finding looks like.
+- **The repo's own `.gitleaks.toml`.** The custom OCI rules from the first post run here too.
+
+---
+
+## The Proof
+
+A job that's never failed hasn't proved anything. So I opened a throwaway pull request, committed a fake random value with `--no-verify`, and watched.
+
+The job failed. The rule was `generic-api-key`, and the value showed as `REDACTED` in the public log. I closed the PR unmerged and deleted the branch. Nothing real was ever in it.
+
+---
+
+## What Surprised Me: Upgrading the Scanner Found New Things
+
+My local hook was pinned to Gitleaks 8.18.4. For CI I used 8.30.1, so I scanned each repo's full history with 8.30.1 before opening the PRs.
+
+The infrastructure repo (20 commits) and the app repo (14 commits) came back clean. The GitOps repo had 2 findings, both in Sealed Secrets. The newer Gitleaks read the kubeseal ciphertext in a `password` field as an API key. The old version had never flagged it.
+
+Those are false positives. Sealed Secret ciphertext is safe to commit by design, since only the cluster's private key can open it. But I didn't want to turn the rule off. I added a narrow allowlist:
+
+```toml
+[[allowlists]]
+description = "kubeseal ciphertext in SealedSecrets"
+targetRules = ["generic-api-key"]
+regexes = ['''^Ag[A-Za-z0-9+/=]{100,}$''']
+```
+
+It applies to one rule, and only to the shape kubeseal produces: `Ag` followed by 100 or more base64 characters. A plaintext password in the same field is still caught. I checked that, and the history stays clean.
+
+The bigger lesson is version drift. If the hook and CI run different Gitleaks versions, they can disagree about the same commit. So I moved the local hook from 8.18.4 to 8.30.1 in the same change. Both places now use the same version and the same rules.
+
+---
+
+## Still Unsure
+
+Whether that ciphertext allowlist could hide a real secret that happens to look like ciphertext. The pattern is narrow, but a narrow pattern is still a hole.
+
+I also haven't made the `gitleaks` job a required check. I'm waiting until it's been green on a few more pull requests. Until then, a failing job is a loud signal, not a hard gate.
+
+---
+
+A hook on your laptop can be skipped. The check that matters runs somewhere you can't skip it.
+
+The workflow is in the repo: [`.github/workflows/gitleaks.yml`](https://github.com/Sandeep-RN/oci-k8s-gitops-demo/blob/main/.github/workflows/gitleaks.yml).
+
+*Originally posted on LinkedIn: [Pinning Gitleaks version in CI for consistent secret scanning](https://lnkd.in/p/dy48QdhK).*
