@@ -1,0 +1,90 @@
+---
+title: "My Tests Passed. The Real Container Still Hung for 20 Seconds."
+description: "A fail-fast fix passed 33 tests, including a server that never answers. Freezing a real Postgres container showed the first request still hung."
+tags: ["SRE", "Python", "PostgreSQL", "Docker", "Debugging"]
+date: "2026-10-27"
+---
+
+My tests passed. The real container still hung for 20 seconds.
+
+This is from my personal OCI Kubernetes GitOps project. It has a small link-shortener API on PostgreSQL. I'd just fixed a reliability bug, my tests said it was fixed, and one real experiment said it wasn't.
+
+---
+
+## The Bug
+
+During a Postgres restart on the OKE cluster, the API hung instead of failing fast with a 503.
+
+A slow failure is worse than a fast one. Users wait, and Kubernetes' readiness probe just times out without ever seeing the 503. The pool waited 5 seconds for a connection, and readiness had no time budget of its own.
+
+---
+
+## First Fix, All Tests Green
+
+My first version did two things:
+
+- Pool timeout down to **2 s**, configurable through `PG_POOL_TIMEOUT` (an invalid value falls back to the default and logs a warning)
+- Readiness gets its own **1 s** budget
+
+33 tests passed. One of them used a "black hole" server: it accepts TCP connections and never answers.
+
+---
+
+## The Experiment
+
+Then I froze a real Postgres container with `docker pause`. The server is still there, but it never answers. That's the failure I was trying to handle.
+
+The first request after the freeze hung for **over 20 seconds**.
+
+---
+
+## Why the Tests Couldn't See It
+
+The pool doesn't always open a new connection. It hands out an existing one, and it checks that connection first with a `SELECT 1`. Against a frozen server, that check had no timeout.
+
+My black-hole test never had an existing connection. Every connection in the test was new, so the code path that hung was never run.
+
+The tests proved the code I'd written. They didn't prove the system.
+
+---
+
+## The Real Fix
+
+- **`TimeBoundedStore`:** every database call runs under a hard time limit, so the API answers 503 on schedule whatever the driver is doing. Stuck workers are bounded: once they're all busy, new calls fail immediately instead of queueing.
+- `connect_timeout` from 3 s to 2 s.
+- `tcp_user_timeout` of 5 s plus TCP keepalives, so threads stuck on a connection to a vanished server get released.
+
+I added tests for hung calls, saturated workers, and the HTTP behaviour. That's where 33 tests became 37. (The PR's screenshot said 37 and the post text said 33: the first is after the fix, the second is the first version.)
+
+---
+
+## Before and After
+
+Same experiment, Postgres frozen with `docker pause`:
+
+| | Before | After |
+|---|---|---|
+| First `/readyz` | hung over 20 s | 503 in 1.5 s |
+| Redirect or create | hung | 503 in 2.0 s |
+| `/healthz` | 200 | 200 |
+| After unfreezing | n/a | `/readyz` 200 within 1 s, link intact |
+
+No tracebacks in the container log, and 0 container restarts.
+
+`/healthz` stays 200 on purpose. Liveness shouldn't depend on the database, or a database outage would restart a healthy app.
+
+---
+
+## Still Unsure
+
+When I wrote this, I'd only proved it against a paused container, not against a real Postgres restart on the cluster.
+
+Since then I've run live outage tests on OKE, with the Postgres pod deleted under steady traffic. The slowest error across those runs was about 2.3 to 2.5 s. The live test also showed something else about my readiness probe. I wrote that up in [My Dashboard Said 6% Errors. My Users Saw About 10%.](/blog/2026-11-03-readiness-hid-errors)
+
+---
+
+Tests prove the code. Breaking real dependencies proves the system.
+
+The change is in the app repo: [Fail fast during a database outage](https://github.com/Sandeep-RN/oci-k8s-gitops-demo-app/pull/9).
+
+*Originally posted on LinkedIn: [My tests passed. The real container still hung for 20 seconds.](https://lnkd.in/p/dxz53U7M)*
